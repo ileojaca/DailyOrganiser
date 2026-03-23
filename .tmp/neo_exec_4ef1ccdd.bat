@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git add . && git commit -m "Add Supabase config, SQL schema, and GoalInput component"

@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && rmdir /S /Q daily-organiser 2>nul || echo "Cleaning up..."

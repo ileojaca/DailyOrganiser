@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && xcopy /E /I /Y daily-organiser\public .\public 2>nul || echo "Copying public..."

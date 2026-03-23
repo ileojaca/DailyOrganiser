@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && move daily-organiser\* .\ 2>nul || echo "Moving files..."

@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && npx create-next-app@latest daily-organiser --typescript --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --yes

@@ -1,105 +1,36 @@
-# DailyOrganiser - AI-Powered Daily Planner SaaS
-
-An intelligent daily planning application that learns from user behavior to provide personalized scheduling suggestions and productivity insights.
-
-## Features
-
-- **Smart Goal Management**: Create tasks with importance levels and time constraints
-- **AI-Powered Scheduling**: Intelligent time block allocation based on your patterns
-- **Energy-Aware Planning**: Matches tasks to your natural energy levels
-- **Context-Aware Suggestions**: Recommends tasks based on location and available tools
-- **Productivity Analytics**: Track completion rates and efficiency metrics
-
-## Tech Stack
-
-- **Frontend**: Next.js 14 + React + TypeScript + Tailwind CSS
-- **Backend**: Next.js API Routes + Supabase Edge Functions
-- **Database**: PostgreSQL (Supabase)
-- **Authentication**: Supabase Auth
-- **AI/ML**: Client-side inference + Edge Functions
-- **Hosting**: Vercel (Frontend) + Supabase (Backend/DB)
-- **CI/CD**: GitHub Actions
-
-## Zero-Dollar Architecture
-
-This project is designed to run entirely on free-tier cloud services:
-
-| Service | Free Tier | Usage |
-|---------|-----------|-------|
-| Vercel | 100 GB/mo, 6K builds | Frontend hosting |
-| Supabase | 500 MB DB, 200 connections | Database + Auth |
-| GitHub Actions | 2,000 min/month | CI/CD |
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 
-### Prerequisites
+First, run the development server:
 
-- Node.js 18+ 
-- npm or yarn
-- Git
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/DailyOrganiser.git
-cd DailyOrganiser
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Set up environment variables:
-```bash
-cp .env.example .env.local
-# Edit .env.local with your Supabase credentials
-```
-
-4. Run the development server:
 ```bash
 npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Project Structure
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-```
-DailyOrganiser/
-├── app/                    # Next.js 14 app directory
-│   ├── api/               # API routes
-│   ├── components/        # React components
-│   ├── lib/               # Utility functions
-│   └── page.tsx           # Main page
-├── components/            # Shared UI components
-│   └── ui/               # shadcn/ui components
-├── lib/                   # Utility functions
-├── public/                # Static assets
-├── styles/                # Global styles
-├── supabase/             # Supabase migrations
-│   └── migrations/       # SQL migrations
-├── .github/              # GitHub Actions
-│   └── workflows/        # CI/CD workflows
-└── docs/                 # Documentation
-```
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Contributing
+## Learn More
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+To learn more about Next.js, take a look at the following resources:
 
-## License
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Acknowledgments
+## Deploy on Vercel
 
-- Built with [Next.js](https://nextjs.org/)
-- Styled with [Tailwind CSS](https://tailwindcss.com/)
-- Database powered by [Supabase](https://supabase.com/)
-- Hosted on [Vercel](https://vercel.com/)
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
