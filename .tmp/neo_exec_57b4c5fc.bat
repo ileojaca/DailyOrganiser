@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git status && git add -A && git commit -m "Fix: Add mock Supabase client for static builds" && git push -u origin main

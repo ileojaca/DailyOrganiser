@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git remote add origin https://github.com/AI-Dev-Org/DailyOrganiser.git 2>nul || echo "Remote already exists or will be added" && git push -u origin main

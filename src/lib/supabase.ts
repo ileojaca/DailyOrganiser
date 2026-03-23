@@ -1,10 +1,39 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Check if we're in a static build or development without env vars
+const isMissingConfig = !supabaseUrl || !supabaseAnonKey || supabaseUrl === ''
 
+// Create a mock client for static builds
+const createMockClient = (): SupabaseClient => {
+  return {
+    auth: {
+      getUser: async () => ({ data: { user: { id: 'mock-user-id', email: 'mock@example.com' } }, error: null }),
+      getSession: async () => ({ data: { session: null }, error: null }),
+      signInWithPassword: async () => ({ data: null, error: null }),
+      signUp: async () => ({ data: null, error: null }),
+      signOut: async () => ({ error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    },
+    from: () => ({
+      select: () => ({ data: [], error: null }),
+      insert: () => ({ error: null }),
+      update: () => ({ error: null }),
+      delete: () => ({ error: null }),
+      eq: () => ({ data: [], error: null }),
+      single: () => ({ data: null, error: null }),
+    }),
+  } as unknown as SupabaseClient
+}
+
+// Export the client (real or mock)
+export const supabase: SupabaseClient = isMissingConfig
+  ? createMockClient()
+  : createClient(supabaseUrl, supabaseAnonKey)
+
+// Database types for TypeScript
 export type Database = {
   public: {
     Tables: {
