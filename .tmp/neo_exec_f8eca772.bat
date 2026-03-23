@@ -1,0 +1,1 @@
+type "c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md" >> temp_spec.md

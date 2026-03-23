@@ -1,0 +1,1 @@
+wc -c "c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md" "c:\Users\AI\Documents\GitHub\DailyOrganiser\AI_FEEDBACK_LOOP.md" "c:\Users\AI\Documents\GitHub\DailyOrganiser\SMART_FUNCTIONALITY.md" "c:\Users\AI\Documents\GitHub\DailyOrganiser\DEVELOPMENT_ROADMAP.md"

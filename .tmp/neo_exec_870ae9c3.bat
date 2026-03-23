@@ -1,0 +1,1 @@
+powershell -Command "Select-String -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md' -Pattern 'Core input parameters'"

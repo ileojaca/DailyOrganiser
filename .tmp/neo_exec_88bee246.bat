@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\SMART_FUNCTIONALITY.md' -TotalCount 50"

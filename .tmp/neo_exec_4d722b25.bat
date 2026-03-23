@@ -1,0 +1,1 @@
+findstr /c:"2,000 minutes" /c:"500 MB artifacts" "c:\Users\AI\Documents\GitHub\DailyOrganiser\HOSTING_STRATEGY.md"

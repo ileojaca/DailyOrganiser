@@ -1,0 +1,1 @@
+findstr /c:"500 MB DB" /c:"200 connections" /c:"500K edge functions" "c:\Users\AI\Documents\GitHub\DailyOrganiser\HOSTING_STRATEGY.md"

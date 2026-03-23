@@ -1,0 +1,1 @@
+dir "c:\Users\AI\Documents\GitHub\DailyOrganiser" /s /b 2>nul || echo "Empty directory"

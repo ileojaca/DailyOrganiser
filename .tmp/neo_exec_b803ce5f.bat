@@ -1,0 +1,1 @@
+powershell -Command "Get-ChildItem 'c:\Users\AI\Documents\GitHub\DailyOrganiser\*.md' | Select-Object Name, @{Name='SizeKB';Expression={[math]::Round($_.Length/1KB,2)}} | Format-Table -AutoSize"

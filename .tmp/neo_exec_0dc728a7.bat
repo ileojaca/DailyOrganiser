@@ -1,0 +1,1 @@
+findstr /c:"100 GB bandwidth" /c:"6K build minutes" "c:\Users\AI\Documents\GitHub\DailyOrganiser\HOSTING_STRATEGY.md"

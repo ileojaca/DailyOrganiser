@@ -1,0 +1,1 @@
+powershell -Command "(Get-Item 'c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md').Length; (Get-Item 'c:\Users\AI\Documents\GitHub\DailyOrganiser\AI_FEEDBACK_LOOP.md').Length; (Get-Item 'c:\Users\AI\Documents\GitHub\DailyOrganiser\SMART_FUNCTIONALITY.md').Length; (Get-Item 'c:\Users\AI\Documents\GitHub\DailyOrganiser\DEVELOPMENT_ROADMAP.md').Length"

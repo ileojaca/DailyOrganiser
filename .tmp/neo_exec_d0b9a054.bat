@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git add . && git commit -m "Initial commit: Project setup with documentation"

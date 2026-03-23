@@ -1,0 +1,1 @@
+dir "c:\Users\AI\Documents\GitHub\DailyOrganiser\*.md" /b && echo "---" && for %f in ("c:\Users\AI\Documents\GitHub\DailyOrganiser\*.md") do @findstr /C:"Document Version" "%f" && @echo %f

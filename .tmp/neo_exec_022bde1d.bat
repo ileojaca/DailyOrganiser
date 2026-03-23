@@ -1,0 +1,1 @@
+findstr /c:"Vercel" /c:"Supabase" /c:"GitHub Actions" "c:\Users\AI\Documents\GitHub\DailyOrganiser\HOSTING_STRATEGY.md" && findstr /c:"9.1" /c:"9.2" "c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md" && findstr /c:"Phase 0" /c:"Phase 1" "c:\Users\AI\Documents\GitHub\DailyOrganiser\DEVELOPMENT_ROADMAP.md"

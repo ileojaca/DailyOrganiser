@@ -1,0 +1,1 @@
+powershell -Command "Select-String -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\DEVELOPMENT_ROADMAP.md' -Pattern 'Phase 2'; Select-String -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\DEVELOPMENT_ROADMAP.md' -Pattern 'Phase 3'; Select-String -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\DEVELOPMENT_ROADMAP.md' -Pattern 'Phase 4'"

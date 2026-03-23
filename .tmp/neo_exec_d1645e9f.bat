@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\AI_FEEDBACK_LOOP.md' -TotalCount 500"

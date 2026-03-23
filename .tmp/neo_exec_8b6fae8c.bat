@@ -1,0 +1,1 @@
+powershell -Command "Select-String -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\AI_FEEDBACK_LOOP.md' -Pattern 'Duration Prediction'; Select-String -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\SMART_FUNCTIONALITY.md' -Pattern 'Predictive Rescheduling System'; Select-String -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\DEVELOPMENT_ROADMAP.md' -Pattern 'Phase 1'"

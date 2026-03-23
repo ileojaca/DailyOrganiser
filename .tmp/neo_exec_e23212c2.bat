@@ -1,0 +1,1 @@
+mkdir "c:\Users\AI\Documents\GitHub\DailyOrganiser" 2>nul || echo "Directory exists or created"

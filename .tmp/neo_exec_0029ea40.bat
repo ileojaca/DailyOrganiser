@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git config user.email "dev@dailyorganiser.com" && git config user.name "DailyOrganiser Dev"

@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md' -TotalCount 500"

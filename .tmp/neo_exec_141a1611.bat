@@ -1,0 +1,1 @@
+echo. >> "c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md" && echo --- >> "c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md" && echo. >> "c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md" && echo "## 9. Enhanced Planning Features" >> "c:\Users\AI\Documents\GitHub\DailyOrganiser\FEATURE_SPECIFICATION.md"
