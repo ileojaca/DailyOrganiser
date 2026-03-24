@@ -31,8 +31,11 @@ export interface Task {
   estimatedDuration: number; // minutes
   energyRequired: number; // 1-10
   category: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   context?: Partial<TaskContext>;
   deadline?: Date;
+  scheduled_start?: string;
+  completed_at?: string | null;
 }
 
 export interface PlanningSuggestion {
@@ -363,4 +366,4 @@ export function calculateProductivityScore(
   return { score, trend, insights };
 }
 
-export default TaskDashboard;
+
