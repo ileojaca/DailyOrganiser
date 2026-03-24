@@ -1,0 +1,1 @@
+npm run build --prefix "c:\Users\AI\Documents\GitHub\DailyOrganiser"

@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && dir *.md /b | find /c ".md"

@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && type package.json | findstr "next tailwind"

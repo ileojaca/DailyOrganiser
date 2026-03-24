@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git add -A && git commit -m "Initial project setup with specifications and Next.js boilerplate" && git push origin main

@@ -1,0 +1,1 @@
+type "c:\Users\AI\Documents\GitHub\DailyOrganiser\package.json"

@@ -1,0 +1,1 @@
+cat "c:\Users\AI\Documents\GitHub\DailyOrganiser\package.json"

@@ -1,0 +1,1 @@
+gh --version 2>nul && echo "GitHub CLI available" || echo "GitHub CLI not available"

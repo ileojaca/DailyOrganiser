@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && type next.config.ts | findstr "output"

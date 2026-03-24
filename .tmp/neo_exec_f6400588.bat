@@ -1,0 +1,1 @@
+ls -l "c:\Users\AI\Documents\GitHub\DailyOrganiser\.gitignore" "c:\Users\AI\Documents\GitHub\DailyOrganiser\.env.example" "c:\Users\AI\Documents\GitHub\DailyOrganiser\README.md"

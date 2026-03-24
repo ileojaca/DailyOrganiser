@@ -1,0 +1,1 @@
+git -C "c:\Users\AI\Documents\GitHub\DailyOrganiser" log --oneline | wc -l && git -C "c:\Users\AI\Documents\GitHub\DailyOrganiser" log --oneline

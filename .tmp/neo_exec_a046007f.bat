@@ -1,0 +1,1 @@
+grep -E "node_modules|.env|.next" "c:\Users\AI\Documents\GitHub\DailyOrganiser\.gitignore"

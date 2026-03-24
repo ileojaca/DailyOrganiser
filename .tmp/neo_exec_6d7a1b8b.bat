@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && dir dist /s /b 2>nul | find /c ".html" || echo "Checking build output..." && dir .next\out /s /b 2>nul | head -20
