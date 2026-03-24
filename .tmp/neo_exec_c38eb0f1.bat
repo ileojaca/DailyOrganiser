@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git add -A && git commit -m "Update main page with Task Dashboard integration"
