@@ -1,0 +1,1 @@
+curl -X POST -H "Authorization: token %GITHUB_TOKEN%" -H "Accept: application/vnd.github.v3+json" https://api.github.com/user/repos -d "{\"name\":\"DailyOrganiser\",\"description\":\"AI-Powered Daily Planner SaaS - Zero-Dollar Tech Stack\",\"private\":false}" 2>nul || echo "Token not available, will try alternative"

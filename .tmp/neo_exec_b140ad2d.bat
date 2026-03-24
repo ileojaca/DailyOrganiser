@@ -1,0 +1,1 @@
+gh auth status 2>nul || echo "GitHub CLI not authenticated"

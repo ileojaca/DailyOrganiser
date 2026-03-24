@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git add -A && git commit -m "Add Task Dashboard, Context-Aware Planning, and CI/CD workflow"
