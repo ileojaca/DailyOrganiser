@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\supabase\migrations\001_initial_schema.sql' -TotalCount 500"

@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'FEATURE_SPECIFICATION.md' -TotalCount 500"

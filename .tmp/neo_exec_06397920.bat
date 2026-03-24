@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && echo "https://ileojaca:${GITHUB_PAT}@github.com" > .git-credentials

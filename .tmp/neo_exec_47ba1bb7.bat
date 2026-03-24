@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path '.env.example' -TotalCount 500"

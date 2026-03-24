@@ -1,0 +1,1 @@
+powershell -Command "Select-String -Path 'FEATURE_SPECIFICATION.md' -Pattern 'firebase'"

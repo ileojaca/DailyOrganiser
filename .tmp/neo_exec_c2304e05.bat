@@ -1,0 +1,1 @@
+ls -la "c:\Users\AI\Documents\GitHub\DailyOrganiser\.git"

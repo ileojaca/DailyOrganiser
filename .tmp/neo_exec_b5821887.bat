@@ -1,0 +1,1 @@
+grep -i "firebase" HOSTING_STRATEGY.md | tail -5

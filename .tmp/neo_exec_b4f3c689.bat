@@ -1,0 +1,1 @@
+powershell -Command "Select-String -Path 'package.json' -Pattern 'firebase'"

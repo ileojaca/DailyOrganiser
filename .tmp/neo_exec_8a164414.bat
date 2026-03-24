@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'firebase/firestore.rules' -TotalCount 500"

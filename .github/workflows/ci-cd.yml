@@ -24,8 +24,11 @@ jobs:
       - name: Run linter
         run: npm run lint
       
-      - name: Type check
-        run: npx tsc --noEmit
+      - name: Run tests
+        run: npm run test:ci
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
 
   build:
     needs: test
@@ -45,8 +48,12 @@ jobs:
       - name: Build application
         run: npm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -73,10 +80,3 @@ jobs:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-        continue-on-error: true
-      
-      - name: Deploy to Vercel (Alternative)
-        if: failure()
-        run: |
-          npm i -g vercel
-          vercel --token ${{ secrets.VERCEL_TOKEN }} --prod --yes

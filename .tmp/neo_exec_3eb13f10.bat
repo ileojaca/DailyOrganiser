@@ -1,0 +1,1 @@
+powershell -Command "Select-String -Path 'HOSTING_STRATEGY.md' -Pattern 'firebase'"

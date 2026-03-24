@@ -1,0 +1,1 @@
+grep -i "firebase" FEATURE_SPECIFICATION.md | tail -5

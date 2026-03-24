@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'firebase/firestore.indexes.json' -TotalCount 500"

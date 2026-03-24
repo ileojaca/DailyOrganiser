@@ -1,0 +1,1 @@
+grep -c "firebase" package.json

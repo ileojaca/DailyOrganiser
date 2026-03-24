@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'HOSTING_STRATEGY.md' -TotalCount 500"

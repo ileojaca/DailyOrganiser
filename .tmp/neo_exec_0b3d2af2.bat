@@ -1,0 +1,1 @@
+ls -l src/lib/firebase.ts firebase/schema/firestore_schema.md firebase/firestore.rules firebase/firestore.indexes.json .env.example .github/workflows/ci-cd.yml src/hooks/useGoals.ts src/hooks/useTimeBlocks.ts

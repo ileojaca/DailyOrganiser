@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'firebase/schema/firestore_schema.md' -TotalCount 500"

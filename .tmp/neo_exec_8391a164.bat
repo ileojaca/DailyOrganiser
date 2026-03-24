@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && powershell -Command "(Get-Content FEATURE_SPECIFICATION.md -Raw) -replace '\*Document Version: 1\.0\*', '*Document Version: 2.0*' -replace 'Last Updated: 2026-03-23', 'Last Updated: 2026-03-24' -replace 'Status: Draft', 'Status: Updated - Firebase Backend Integration' | Set-Content FEATURE_SPECIFICATION.md"

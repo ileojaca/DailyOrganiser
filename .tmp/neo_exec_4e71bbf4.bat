@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'src/hooks/useGoals.ts' -TotalCount 500"

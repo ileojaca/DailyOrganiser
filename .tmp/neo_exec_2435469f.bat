@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path '.github/workflows/ci-cd.yml' -TotalCount 500"
