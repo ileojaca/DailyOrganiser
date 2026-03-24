@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git commit -m "Initial commit: DailyOrganiser project with documentation and Next.js skeleton"

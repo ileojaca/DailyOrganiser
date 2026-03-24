@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git commit -m "Update .gitignore to exclude .tmp directory" && git push origin main

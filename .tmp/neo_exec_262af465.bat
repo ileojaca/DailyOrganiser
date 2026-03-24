@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git reset && echo ".tmp/" >> .gitignore && git add -A && git status

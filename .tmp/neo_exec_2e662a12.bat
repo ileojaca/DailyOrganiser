@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git add -A && git commit -m "Initial project setup with documentation and Next.js skeleton" || echo "Nothing to commit"

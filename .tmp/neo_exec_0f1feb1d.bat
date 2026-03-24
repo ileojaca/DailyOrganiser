@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git reset HEAD .tmp/ && git rm -r --cached .tmp 2>nul || true && git status
