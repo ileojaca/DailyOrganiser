@@ -1,0 +1,1 @@
+powershell -Command "Get-Content -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\utils\contextAwarePlanning.ts' -TotalCount 50"

@@ -1,0 +1,1 @@
+curl -X POST -H "Authorization: token %GITHUB_TOKEN%" -H "Accept: application/vnd.github.v3+json" https://api.github.com/user/repos -d "{\"name\":\"DailyOrganiser\",\"private\":false,\"description\":\"AI-powered daily planner SaaS with intelligent task scheduling and productivity insights\"}" 2>&1

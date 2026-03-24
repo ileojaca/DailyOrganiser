@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && powershell -Command "(Get-Content src\utils\contextAwarePlanning.ts) -replace 'export default TaskDashboard;', '' | Set-Content src\utils\contextAwarePlanning.ts"

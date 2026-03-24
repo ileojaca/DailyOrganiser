@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git remote set-url origin https://github.com/ileojaca/DailyOrganiser.git
