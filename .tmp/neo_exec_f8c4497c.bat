@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && npx vercel --token $env:VERCEL_TOKEN --yes 2>&1 || echo "Checking Vercel status..."
