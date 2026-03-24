@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && git add vercel.json && git commit -m "chore: Add Vercel deployment configuration" && git push origin main

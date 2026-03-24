@@ -1,0 +1,1 @@
+powershell -Command "(Get-Content 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\lib\firebase.ts') -replace 'doc: function\(path: string\)', 'doc: (path: string)' | Set-Content 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\lib\firebase.ts'"

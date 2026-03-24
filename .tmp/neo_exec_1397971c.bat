@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && npx vercel --help 2>&1 | findstr "deploy"

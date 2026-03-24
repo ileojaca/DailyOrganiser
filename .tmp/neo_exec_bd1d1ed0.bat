@@ -1,0 +1,1 @@
+echo %VERCEL_TOKEN% | findstr /V "ECHO" || echo "Token not set in environment"

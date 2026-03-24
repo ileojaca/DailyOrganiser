@@ -67,7 +67,7 @@ const createMockFirestore = (): Firestore => {
           data: () => null,
           id: id || 'mock-doc-id',
           metadata: {}
-        } as DocumentSnapshot<DocumentData>),
+        } as unknown as DocumentSnapshot<DocumentData>),
         set: async (data: DocumentData) => { mockData.set(`${path}/${id || 'mock-doc-id'}`, data) },
         update: async (data: Partial<DocumentData>) => { 
           const existing = mockData.get(`${path}/${id || 'mock-doc-id'}`) || {}
@@ -80,7 +80,7 @@ const createMockFirestore = (): Firestore => {
         empty: true,
         size: 0,
         metadata: {}
-      } as QuerySnapshot<DocumentData>),
+      } as unknown as QuerySnapshot<DocumentData>),
       where: () => ({ get: async () => ({ docs: [], empty: true, size: 0 }) }),
       orderBy: () => ({ get: async () => ({ docs: [], empty: true, size: 0 }) })
     }),
@@ -91,7 +91,7 @@ const createMockFirestore = (): Firestore => {
       commit: async () => {}
     }),
     runTransaction: async () => ({}),
-    doc: function(path: string) {
+    doc: (path: string) {
       return this.collection('').doc(path)
     }
   } as unknown as Firestore

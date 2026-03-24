@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && dir /s /b .vercel 2>nul | findstr "project.json" || echo "No .vercel directory found"

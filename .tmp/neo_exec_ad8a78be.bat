@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && npx vercel list 2>&1 | findstr "daily-organiser" || echo "Project not found in list"

@@ -1,0 +1,1 @@
+powershell -Command "(Get-Content 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\lib\firebase.ts') -replace 'as QuerySnapshot<DocumentData>)', 'as unknown as QuerySnapshot<DocumentData>)' | Set-Content 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\lib\firebase.ts'"

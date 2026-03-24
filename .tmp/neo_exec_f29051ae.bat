@@ -1,0 +1,1 @@
+powershell -Command "(Get-Content 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\hooks\useAccomplishmentLogs.ts') -replace 'deleteDoc,', 'deleteDoc,`n  getDocs,' | Set-Content 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\hooks\useAccomplishmentLogs.ts' -NoNewline"

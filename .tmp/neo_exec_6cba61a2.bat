@@ -1,0 +1,1 @@
+powershell -Command "(Get-Content 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\lib\firebase.ts') -replace 'doc: function\(path: string\) \{\s*return this\.collection\(\'\'\)\.doc\(path\)\s*\}', 'doc: (path: string) => createMockFirestore().collection("").doc(path)' | Set-Content 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\lib\firebase.ts'"

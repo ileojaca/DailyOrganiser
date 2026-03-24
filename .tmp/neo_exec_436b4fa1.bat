@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && dir vercel.json 2>nul || echo "No vercel.json found"

@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && type .vercel\project.json 2>nul || echo "No local Vercel project config"

@@ -1,0 +1,1 @@
+cd c:\Users\AI\Documents\GitHub\DailyOrganiser && npx vercel projects ls 2>&1 | findstr "daily" || echo "Checking projects..."

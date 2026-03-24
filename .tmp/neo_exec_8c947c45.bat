@@ -1,0 +1,1 @@
+powershell -Command "(Get-Content -Path 'c:\Users\AI\Documents\GitHub\DailyOrganiser\src\hooks\useAccomplishmentLogs.ts' -Head 15 | Select-Object -Skip 1) -join \"`n\""
