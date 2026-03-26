@@ -29,7 +29,7 @@ export default function AuthPage() {
       } else if (mode === 'signup') {
         await signUp(email, password, fullName);
         router.push('/');
-      } else {km, k
+      } else {
         await resetPassword(email);
         setMessage('Password reset email sent. Check your inbox.');
       }
