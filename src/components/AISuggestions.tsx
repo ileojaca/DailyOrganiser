@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { generatePlanningSuggestions, TaskContext } from '@/utils/contextAwarePlanning';
@@ -39,7 +39,7 @@ export default function AISuggestions() {
         estimatedDuration: g.estimatedDuration || 60,
         energyRequired: g.energyRequired || 5,
         category: g.category,
-        status: g.status,
+        status: (g.status === 'deferred' ? 'pending' : g.status) as 'pending' | 'in_progress' | 'completed' | 'cancelled',
         deadline: g.deadline,
       })),
       userEnergy,
