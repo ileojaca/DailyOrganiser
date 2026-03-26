@@ -13,7 +13,7 @@ import {
   Timestamp,
   DocumentData
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { getDb } from '@/lib/firebase'
 
 export interface AccomplishmentLog {
   id: string
@@ -69,6 +69,7 @@ export function useAccomplishmentLogs(userId: string | undefined) {
 
     setLoading(true)
 
+    const db = getDb()
     const logsQuery = query(
       collection(db, 'users', userId, 'accomplishmentLogs'),
       orderBy('scheduledDate', 'desc')
@@ -110,6 +111,7 @@ export function useAccomplishmentLogs(userId: string | undefined) {
   const createLog = useCallback(async (input: CreateLogInput): Promise<string> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const logData = {
       goalId: input.goalId || null,
       scheduledDate: input.scheduledDate,
@@ -130,6 +132,7 @@ export function useAccomplishmentLogs(userId: string | undefined) {
   const updateLog = useCallback(async (logId: string, input: UpdateLogInput): Promise<void> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const updateData: DocumentData = {}
 
     if (input.goalId !== undefined) updateData.goalId = input.goalId
@@ -148,6 +151,7 @@ export function useAccomplishmentLogs(userId: string | undefined) {
   const deleteLog = useCallback(async (logId: string): Promise<void> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const logRef = doc(db, 'users', userId, 'accomplishmentLogs', logId)
     await deleteDoc(logRef)
   }, [userId])
@@ -156,6 +160,7 @@ export function useAccomplishmentLogs(userId: string | undefined) {
   const getLogsByDateRange = useCallback(async (startDate: string, endDate: string): Promise<AccomplishmentLog[]> => {
     if (!userId) return []
 
+    const db = getDb()
     const logsQuery = query(
       collection(db, 'users', userId, 'accomplishmentLogs'),
       where('scheduledDate', '>=', startDate),

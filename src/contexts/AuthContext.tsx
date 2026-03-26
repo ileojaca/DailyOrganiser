@@ -12,7 +12,7 @@ import {
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { getAuthInstance, getDb } from '@/lib/firebase';
 
 interface UserProfile {
   email: string;
@@ -45,21 +45,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        await loadProfile(firebaseUser.uid);
-      } else {
-        setProfile(null);
+    let isMounted = true;
+    
+    const initAuth = async () => {
+      try {
+        const authInstance = getAuthInstance();
+        const unsubscribe = onAuthStateChanged(authInstance, async (firebaseUser) => {
+          if (!isMounted) return;
+          
+          setUser(firebaseUser);
+          if (firebaseUser) {
+            await loadProfile(firebaseUser.uid);
+          } else {
+            setProfile(null);
+          }
+          setLoading(false);
+        });
+        return unsubscribe;
+      } catch (error) {
+        console.error('Firebase init error:', error);
+        setLoading(false);
       }
-      setLoading(false);
-    });
-    return unsubscribe;
+    };
+
+    const unsubPromise = initAuth();
+    
+    return () => {
+      isMounted = false;
+      unsubPromise.then(unsub => unsub?.());
+    };
   }, []);
 
   const loadProfile = async (uid: string) => {
     try {
-      const docRef = doc(db, 'users', uid);
+      const dbInstance = getDb();
+      const docRef = doc(dbInstance, 'users', uid);
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data();
@@ -75,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createUserProfile = async (uid: string, email: string, fullName?: string) => {
+    const dbInstance = getDb();
     const now = Timestamp.now();
     const profileData = {
       email,
@@ -86,41 +107,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       createdAt: now,
       updatedAt: now,
     };
-    await setDoc(doc(db, 'users', uid), profileData);
+    await setDoc(doc(dbInstance, 'users', uid), profileData);
     setProfile({ ...profileData, createdAt: now.toDate(), updatedAt: now.toDate() });
   };
 
   const signIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    const authInstance = getAuthInstance();
+    await signInWithEmailAndPassword(authInstance, email, password);
   };
 
   const signUp = async (email: string, password: string, fullName?: string) => {
-    const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
+    const authInstance = getAuthInstance();
+    const { user: newUser } = await createUserWithEmailAndPassword(authInstance, email, password);
     await createUserProfile(newUser.uid, email, fullName);
   };
 
   const signInWithGoogle = async () => {
+    const authInstance = getAuthInstance();
+    const dbInstance = getDb();
     const provider = new GoogleAuthProvider();
-    const { user: googleUser } = await signInWithPopup(auth, provider);
-    const snap = await getDoc(doc(db, 'users', googleUser.uid));
+    const { user: googleUser } = await signInWithPopup(authInstance, provider);
+    const snap = await getDoc(doc(dbInstance, 'users', googleUser.uid));
     if (!snap.exists()) {
       await createUserProfile(googleUser.uid, googleUser.email!, googleUser.displayName || undefined);
     }
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    const authInstance = getAuthInstance();
+    await firebaseSignOut(authInstance);
     setProfile(null);
   };
 
   const resetPassword = async (email: string) => {
-    await sendPasswordResetEmail(auth, email);
+    const authInstance = getAuthInstance();
+    await sendPasswordResetEmail(authInstance, email);
   };
 
   const updateProfile = async (data: Partial<UserProfile>) => {
     if (!user) throw new Error('Not authenticated');
+    const dbInstance = getDb();
     const updateData = { ...data, updatedAt: Timestamp.now() };
-    await setDoc(doc(db, 'users', user.uid), updateData, { merge: true });
+    await setDoc(doc(dbInstance, 'users', user.uid), updateData, { merge: true });
     setProfile((prev) => prev ? { ...prev, ...data } : null);
   };
 

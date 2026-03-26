@@ -3,7 +3,6 @@ import {
   collection, 
   doc, 
   query, 
-  where, 
   orderBy, 
   onSnapshot,
   addDoc,
@@ -12,7 +11,7 @@ import {
   Timestamp,
   DocumentData
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { getDb } from '@/lib/firebase'
 
 export interface Goal {
   id: string
@@ -81,6 +80,7 @@ export function useGoals(userId: string | undefined) {
 
     setLoading(true)
     
+    const db = getDb()
     const goalsQuery = query(
       collection(db, 'users', userId, 'goals'),
       orderBy('createdAt', 'desc')
@@ -130,6 +130,7 @@ export function useGoals(userId: string | undefined) {
   const createGoal = useCallback(async (input: CreateGoalInput): Promise<string> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const now = Timestamp.now()
     const goalData = {
       title: input.title,
@@ -155,6 +156,7 @@ export function useGoals(userId: string | undefined) {
   const updateGoal = useCallback(async (goalId: string, input: UpdateGoalInput): Promise<void> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const updateData: DocumentData = {
       updatedAt: Timestamp.now()
     }
@@ -181,6 +183,7 @@ export function useGoals(userId: string | undefined) {
   const deleteGoal = useCallback(async (goalId: string): Promise<void> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const goalRef = doc(db, 'users', userId, 'goals', goalId)
     await deleteDoc(goalRef)
   }, [userId])
@@ -189,6 +192,7 @@ export function useGoals(userId: string | undefined) {
   const completeGoal = useCallback(async (goalId: string, actualDuration?: number): Promise<void> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const goalRef = doc(db, 'users', userId, 'goals', goalId)
     await updateDoc(goalRef, {
       status: 'completed',

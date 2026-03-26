@@ -10,7 +10,7 @@ import {
   deleteDoc,
   Timestamp
 } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
+import { getDb } from '@/lib/firebase'
 
 export interface TimeBlock {
   id: string
@@ -64,6 +64,7 @@ export function useTimeBlocks(userId: string | undefined) {
 
     setLoading(true)
 
+    const db = getDb()
     const blocksQuery = query(
       collection(db, 'users', userId, 'timeBlocks'),
       orderBy('startTime')
@@ -107,6 +108,7 @@ export function useTimeBlocks(userId: string | undefined) {
   const createTimeBlock = useCallback(async (input: CreateTimeBlockInput): Promise<string> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const now = Timestamp.now()
     
     // Calculate duration from start and end times
@@ -136,6 +138,7 @@ export function useTimeBlocks(userId: string | undefined) {
   const updateTimeBlock = useCallback(async (blockId: string, input: UpdateTimeBlockInput): Promise<void> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const updateData: { [key: string]: any } = {
       updatedAt: Timestamp.now()
     }
@@ -167,6 +170,7 @@ export function useTimeBlocks(userId: string | undefined) {
   const deleteTimeBlock = useCallback(async (blockId: string): Promise<void> => {
     if (!userId) throw new Error('User not authenticated')
 
+    const db = getDb()
     const blockRef = doc(db, 'users', userId, 'timeBlocks', blockId)
     await deleteDoc(blockRef)
   }, [userId])
