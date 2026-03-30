@@ -24,6 +24,7 @@ interface UserProfile {
   chronotype: 'lark' | 'owl' | 'intermediate';
   energyPattern: { peakHours: string[]; lowHours: string[] };
   preferences: { notifications: boolean; reminders: boolean; suggestionAlerts: boolean };
+  subscription_tier?: string;
   createdAt: Date;
   updatedAt: Date;
 }

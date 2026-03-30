@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import AppShell from '@/components/AppShell';
+import { SUBSCRIPTION_TIERS, getTierById } from '@/config/subscriptionTiers';
 
 interface UserProfile {
   email: string;
@@ -17,9 +18,10 @@ interface UserProfile {
 export default function SettingsPage() {
   const { user, profile, updateProfile, signOut } = useAuth();
   const { mode, setMode, accentColor, setAccentColor } = useTheme();
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'appearance' | 'account'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'appearance' | 'subscription' | 'account'>('profile');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [loadingPortal, setLoadingPortal] = useState(false);
 
   const [formData, setFormData] = useState<Partial<UserProfile>>({
     fullName: '',
@@ -58,6 +60,45 @@ export default function SettingsPage() {
     await signOut();
   };
 
+  const handleManageSubscription = async () => {
+    setLoadingPortal(true);
+    try {
+      const response = await fetch('/api/subscriptions/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnUrl: window.location.href }),
+      });
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Error opening billing portal:', error);
+    } finally {
+      setLoadingPortal(false);
+    }
+  };
+
+  const handleUpgrade = async (priceId: string) => {
+    try {
+      const response = await fetch('/api/subscriptions/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          priceId,
+          successUrl: `${window.location.origin}/settings?success=true`,
+          cancelUrl: `${window.location.origin}/settings?canceled=true`,
+        }),
+      });
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error);
+    }
+  };
+
   const timezones = [
     'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
     'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Asia/Tokyo', 'Asia/Shanghai',
@@ -84,6 +125,7 @@ export default function SettingsPage() {
             { id: 'profile', label: 'Profile' },
             { id: 'notifications', label: 'Notifications' },
             { id: 'appearance', label: 'Appearance' },
+            { id: 'subscription', label: 'Subscription' },
             { id: 'account', label: 'Account' },
           ].map((tab) => (
             <button
@@ -333,6 +375,80 @@ export default function SettingsPage() {
                     style={{ backgroundColor: color.value }}
                     title={color.name}
                   />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Subscription Tab */}
+        {activeTab === 'subscription' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white mb-2">Current Plan</h3>
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-900 dark:text-white">
+                      {getTierById(profile?.subscription_tier || 'free')?.name || 'Free'} Plan
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {profile?.subscription_tier === 'free' ? 'Limited features' : 'Full access to all features'}
+                    </p>
+                  </div>
+                  {profile?.subscription_tier !== 'free' && (
+                    <button
+                      onClick={handleManageSubscription}
+                      disabled={loadingPortal}
+                      className="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
+                    >
+                      {loadingPortal ? 'Loading...' : 'Manage Subscription'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Available Plans</h3>
+              <div className="grid gap-4 md:grid-cols-3">
+                {Object.values(SUBSCRIPTION_TIERS).map((tier) => (
+                  <div
+                    key={tier.id}
+                    className={`p-4 rounded-lg border-2 ${
+                      profile?.subscription_tier === tier.id
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-200 dark:border-gray-600'
+                    }`}
+                  >
+                    <h4 className="font-semibold text-gray-900 dark:text-white">{tier.name}</h4>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
+                      ${tier.price}<span className="text-sm font-normal">/month</span>
+                    </p>
+                    <ul className="mt-4 space-y-2">
+                      {tier.features.map((feature, index) => (
+                        <li key={index} className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                          <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                    {profile?.subscription_tier !== tier.id && tier.price > 0 && (
+                      <button
+                        onClick={() => handleUpgrade(tier.priceId)}
+                        className="w-full mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                      >
+                        Upgrade to {tier.name}
+                      </button>
+                    )}
+                    {profile?.subscription_tier === tier.id && (
+                      <div className="mt-4 px-4 py-2 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-center text-sm font-medium">
+                        Current Plan
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

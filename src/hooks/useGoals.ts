@@ -33,6 +33,7 @@ export interface Goal {
   energyRequired?: number
   scheduledStart?: Date
   scheduledEnd?: Date
+  assigneeId?: string
   createdAt: Date
   updatedAt: Date
   completedAt?: Date
@@ -62,6 +63,7 @@ interface UpdateGoalInput {
   energyRequired?: number
   scheduledStart?: Date
   scheduledEnd?: Date
+  assigneeId?: string
   completedAt?: Date
 }
 
@@ -107,6 +109,7 @@ export function useGoals(userId: string | undefined) {
             energyRequired: data.energyRequired,
             scheduledStart: data.scheduledStart?.toDate(),
             scheduledEnd: data.scheduledEnd?.toDate(),
+            assigneeId: data.assigneeId,
             createdAt: data.createdAt?.toDate(),
             updatedAt: data.updatedAt?.toDate(),
             completedAt: data.completedAt?.toDate()
@@ -173,6 +176,7 @@ export function useGoals(userId: string | undefined) {
     if (input.energyRequired !== undefined) updateData.energyRequired = input.energyRequired
     if (input.scheduledStart !== undefined) updateData.scheduledStart = input.scheduledStart ? Timestamp.fromDate(input.scheduledStart) : null
     if (input.scheduledEnd !== undefined) updateData.scheduledEnd = input.scheduledEnd ? Timestamp.fromDate(input.scheduledEnd) : null
+    if (input.assigneeId !== undefined) updateData.assigneeId = input.assigneeId
     if (input.completedAt !== undefined) updateData.completedAt = input.completedAt ? Timestamp.fromDate(input.completedAt) : null
 
     const goalRef = doc(db, 'users', userId, 'goals', goalId)
