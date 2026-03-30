@@ -29,6 +29,7 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -43,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,8 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setLoading(false);
         });
         return unsubscribe;
-      } catch (error) {
-        console.error('Firebase init error:', error);
+      } catch (err) {
+        console.error('Firebase initialization error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to initialize Firebase');
         setLoading(false);
       }
     };
@@ -112,17 +115,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
+    setError(null);
     const authInstance = getAuthInstance();
     await signInWithEmailAndPassword(authInstance, email, password);
   };
 
   const signUp = async (email: string, password: string, fullName?: string) => {
+    setError(null);
     const authInstance = getAuthInstance();
     const { user: newUser } = await createUserWithEmailAndPassword(authInstance, email, password);
     await createUserProfile(newUser.uid, email, fullName);
   };
 
   const signInWithGoogle = async () => {
+    setError(null);
     const authInstance = getAuthInstance();
     const dbInstance = getDb();
     const provider = new GoogleAuthProvider();
@@ -140,6 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
+    setError(null);
     const authInstance = getAuthInstance();
     await sendPasswordResetEmail(authInstance, email);
   };
@@ -153,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signInWithGoogle, signOut, resetPassword, updateProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, error, signIn, signUp, signInWithGoogle, signOut, resetPassword, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

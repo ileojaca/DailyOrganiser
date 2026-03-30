@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 type Mode = 'signin' | 'signup' | 'reset';
 
 export default function AuthPage() {
-  const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPassword, error: authError } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -141,8 +141,8 @@ export default function AuthPage() {
               </div>
             )}
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error}</div>
+            {(error || authError) && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">{error || authError}</div>
             )}
             {message && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">{message}</div>
