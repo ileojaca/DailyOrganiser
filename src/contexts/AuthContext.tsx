@@ -8,8 +8,11 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   GoogleAuthProvider,
+  GithubAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
+  sendEmailVerification,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { getAuthInstance, getDb } from '@/lib/firebase';
@@ -33,9 +36,12 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName?: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithGithub: () => Promise<void>;
+  signInWithMicrosoft: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -125,6 +131,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const authInstance = getAuthInstance();
     const { user: newUser } = await createUserWithEmailAndPassword(authInstance, email, password);
     await createUserProfile(newUser.uid, email, fullName);
+    // Send verification email
+    await sendEmailVerification(newUser);
   };
 
   const signInWithGoogle = async () => {
@@ -136,6 +144,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const snap = await getDoc(doc(dbInstance, 'users', googleUser.uid));
     if (!snap.exists()) {
       await createUserProfile(googleUser.uid, googleUser.email!, googleUser.displayName || undefined);
+    }
+  };
+
+  const signInWithGithub = async () => {
+    setError(null);
+    const authInstance = getAuthInstance();
+    const dbInstance = getDb();
+    const provider = new GithubAuthProvider();
+    const { user: githubUser } = await signInWithPopup(authInstance, provider);
+    const snap = await getDoc(doc(dbInstance, 'users', githubUser.uid));
+    if (!snap.exists()) {
+      await createUserProfile(githubUser.uid, githubUser.email!, githubUser.displayName || undefined);
+    }
+  };
+
+  const signInWithMicrosoft = async () => {
+    setError(null);
+    const authInstance = getAuthInstance();
+    const dbInstance = getDb();
+    const provider = new OAuthProvider('microsoft.com');
+    const { user: microsoftUser } = await signInWithPopup(authInstance, provider);
+    const snap = await getDoc(doc(dbInstance, 'users', microsoftUser.uid));
+    if (!snap.exists()) {
+      await createUserProfile(microsoftUser.uid, microsoftUser.email!, microsoftUser.displayName || undefined);
     }
   };
 
@@ -151,6 +183,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await sendPasswordResetEmail(authInstance, email);
   };
 
+  const sendVerificationEmail = async () => {
+    if (!user) throw new Error('Not authenticated');
+    await sendEmailVerification(user);
+  };
+
   const updateProfile = async (data: Partial<UserProfile>) => {
     if (!user) throw new Error('Not authenticated');
     const dbInstance = getDb();
@@ -160,7 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, error, signIn, signUp, signInWithGoogle, signOut, resetPassword, updateProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, error, signIn, signUp, signInWithGoogle, signInWithGithub, signInWithMicrosoft, signOut, resetPassword, updateProfile, sendVerificationEmail }}>
       {children}
     </AuthContext.Provider>
   );

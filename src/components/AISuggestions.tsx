@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { generatePlanningSuggestions, TaskContext } from '@/utils/contextAwarePlanning';
@@ -17,6 +17,8 @@ export default function AISuggestions() {
   const [location, setLocation] = useState<TaskContext['location']>('home');
   const [network, setNetwork] = useState<TaskContext['networkStatus']>('online');
   const [showAll, setShowAll] = useState(false);
+  const [insights, setInsights] = useState<any>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   const suggestions = useMemo(() => {
     if (goals.length === 0) return [];
@@ -50,6 +52,26 @@ export default function AISuggestions() {
 
   const displayed = showAll ? suggestions : suggestions.slice(0, 3);
 
+  // Fetch insights on mount and when context changes
+  useEffect(() => {
+    const fetchInsights = async () => {
+      if (!user) return;
+      setLoadingInsights(true);
+      try {
+        const response = await fetch('/api/insights?type=overview&days=7');
+        if (response.ok) {
+          const data = await response.json();
+          setInsights(data.insights);
+        }
+      } catch (error) {
+        console.error('Failed to fetch insights:', error);
+      } finally {
+        setLoadingInsights(false);
+      }
+    };
+    fetchInsights();
+  }, [user]);
+
   const alignmentColor = (a: string) => {
     if (a === 'optimal') return 'text-green-600 bg-green-50';
     if (a === 'good') return 'text-blue-600 bg-blue-50';
@@ -71,6 +93,27 @@ export default function AISuggestions() {
       </div>
 
       <div className="p-4 space-y-4">
+        {/* Real-time context info */}
+        {insights && insights.burnoutRisk && insights.burnoutRisk.riskLevel !== 'low' && (
+          <div className={`p-3 rounded-xl text-xs ${
+            insights.burnoutRisk.riskLevel === 'critical' ? 'bg-red-50 border border-red-200' :
+            insights.burnoutRisk.riskLevel === 'high' ? 'bg-orange-50 border border-orange-200' :
+            'bg-yellow-50 border border-yellow-200'
+          }`}>
+            <div className="flex items-center gap-2 mb-1">
+              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="font-semibold text-red-700">Burnout Risk: {insights.burnoutRisk.riskLevel}</span>
+            </div>
+            <ul className="list-disc list-inside text-red-600 space-y-0.5">
+              {insights.burnoutRisk.factors.slice(0, 2).map((factor: string, i: number) => (
+                <li key={i}>{factor}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Context inputs */}
         <div className="space-y-3">
           <div>
@@ -119,6 +162,24 @@ export default function AISuggestions() {
             </div>
           </div>
         </div>
+
+        {/* Productivity insights */}
+        {insights && insights.summary && (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-green-50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-green-700">{insights.summary.completedTasks}</p>
+              <p className="text-[10px] text-green-600">Completed</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-blue-700">{Math.round(insights.summary.averageEfficiency * 100)}%</p>
+              <p className="text-[10px] text-blue-600">Efficiency</p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-2 text-center">
+              <p className="text-lg font-bold text-purple-700">{insights.summary.totalTasks}</p>
+              <p className="text-[10px] text-purple-600">Total</p>
+            </div>
+          </div>
+        )}
 
         {/* Suggestions */}
         {suggestions.length === 0 ? (

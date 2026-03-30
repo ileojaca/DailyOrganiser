@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 type Mode = 'signin' | 'signup' | 'reset';
 
 export default function AuthPage() {
-  const { signIn, signUp, signInWithGoogle, resetPassword, error: authError } = useAuth();
+  const { signIn, signUp, signInWithGoogle, resetPassword, sendVerificationEmail, error: authError } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -16,6 +16,7 @@ export default function AuthPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +29,8 @@ export default function AuthPage() {
         router.push('/');
       } else if (mode === 'signup') {
         await signUp(email, password, fullName);
-        router.push('/');
+        setShowVerification(true);
+        setMessage('Verification email sent! Please check your inbox.');
       } else {
         await resetPassword(email);
         setMessage('Password reset email sent. Check your inbox.');
@@ -50,6 +52,20 @@ export default function AuthPage() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Google sign-in failed';
       setError(msg.replace('Firebase: ', '').trim());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await sendVerificationEmail();
+      setMessage('Verification email resent! Check your inbox.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to resend verification email';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -146,6 +162,19 @@ export default function AuthPage() {
             )}
             {message && (
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-700">{message}</div>
+            )}
+            {showVerification && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700">
+                <p className="font-medium">Email verification required</p>
+                <p className="mt-1">Please check your email and click the verification link to activate your account.</p>
+                <button
+                  onClick={handleResendVerification}
+                  disabled={loading}
+                  className="mt-2 text-blue-600 hover:text-blue-700 underline"
+                >
+                  Resend verification email
+                </button>
+              </div>
             )}
 
             <button
