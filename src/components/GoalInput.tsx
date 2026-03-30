@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
+import { parseTaskInput } from '@/utils/nlpTaskParser';
 
 interface GoalFormData {
   title: string;
@@ -49,12 +50,36 @@ export default function GoalInput() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [expanded, setExpanded] = useState(false);
+  const [isNLPMode, setIsNLPMode] = useState(false);
+  const [nlpInput, setNlpInput] = useState('');
 
   const set = (field: keyof GoalFormData, value: unknown) =>
     setFormData((p) => ({ ...p, [field]: value }));
 
   const setCtx = (field: string, value: unknown) =>
     setFormData((p) => ({ ...p, context: { ...p.context, [field]: value } }));
+
+  const handleNLPParse = () => {
+    if (!nlpInput.trim()) return;
+    const parsed = parseTaskInput(nlpInput);
+    setFormData({
+      ...INITIAL,
+      title: parsed.title,
+      description: '',
+      category: parsed.category || 'personal',
+      priority: parsed.priority || 3,
+      estimatedDuration: parsed.duration || 60,
+      deadline: parsed.deadline ? parsed.deadline.toISOString().slice(0, 16) : '',
+      energyRequired: parsed.energyRequired || 5,
+      context: { 
+        location: parsed.context?.location || 'home', 
+        tools: parsed.context?.tools || ['computer'], 
+        networkStatus: parsed.context?.networkStatus || 'online' 
+      },
+    });
+    setIsNLPMode(false);
+    setExpanded(true);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,19 +116,66 @@ export default function GoalInput() {
       </div>
 
       <form onSubmit={handleSubmit} className="p-5 space-y-4">
-        <div>
-          <input
-            type="text"
-            value={formData.title}
-            onChange={(e) => set('title', e.target.value)}
-            onFocus={() => setExpanded(true)}
-            placeholder="What do you want to accomplish?"
-            maxLength={100}
-            required
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
-          />
-          <p className="text-xs text-gray-400 mt-1 text-right">{formData.title.length}/100</p>
+        {/* NLP Mode Toggle */}
+        <div className="flex items-center justify-end mb-2">
+          <button
+            type="button"
+            onClick={() => setIsNLPMode(!isNLPMode)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+              isNLPMode 
+                ? 'bg-purple-100 text-purple-700 border border-purple-300' 
+                : 'bg-gray-50 text-gray-500 border border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            AI Input
+          </button>
         </div>
+
+        {isNLPMode ? (
+          <div className="space-y-2">
+            <textarea
+              value={nlpInput}
+              onChange={(e) => setNlpInput(e.target.value)}
+              placeholder="Try: 'Schedule 30min workout tomorrow at 7am, high priority, for health'"
+              className="w-full px-4 py-2.5 rounded-lg border border-purple-300 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-900 placeholder-gray-400 text-sm"
+              rows={3}
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleNLPParse}
+                disabled={!nlpInput.trim()}
+                className="flex-1 py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                Parse with AI
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsNLPMode(false)}
+                className="px-4 py-2 text-sm text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => set('title', e.target.value)}
+              onFocus={() => setExpanded(true)}
+              placeholder="What do you want to accomplish?"
+              maxLength={100}
+              required
+              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-400"
+            />
+            <p className="text-xs text-gray-400 mt-1 text-right">{formData.title.length}/100</p>
+          </div>
+        )}
 
         {expanded && (
           <>
