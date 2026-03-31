@@ -181,6 +181,18 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    // Helper function to check if user is team member
+    function isTeamMember(teamId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid));
+    }
+    
+    // Helper function to check if user is team admin/owner
+    function isTeamAdmin(teamId) {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.role in ['owner', 'admin'];
+    }
+    
     // Users collection - users can only read/write their own profile
     match /users/{userId} {
       allow read, write: if isOwner(userId);
@@ -199,6 +211,58 @@ service cloud.firestore {
     // Accomplishment logs subcollection
     match /users/{userId}/accomplishmentLogs/{logId} {
       allow read, write: if isOwner(userId);
+    }
+    
+    // Teams collection
+    match /teams/{teamId} {
+      allow read: if isTeamMember(teamId);
+      allow write: if isTeamAdmin(teamId);
+    }
+    
+    // Team members subcollection
+    match /teams/{teamId}/members/{userId} {
+      allow read: if isTeamMember(teamId);
+      allow write: if isTeamAdmin(teamId) || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActive', 'status']));
+    }
+    
+    // Team invitations
+    match /teamInvitations/{invitationId} {
+      allow read: if isAuthenticated() && resource.data.email == request.auth.token.email;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.email == request.auth.token.email;
+    }
+    
+    // Subscriptions collection
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Only server-side via Admin SDK
+    }
+    
+    // Notification preferences
+    match /notificationPreferences/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+    
+    // Push subscriptions
+    match /pushSubscriptions/{subscriptionId} {
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // API keys (read-only for user, write only via Admin SDK)
+    match /apiKeys/{keyId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Only server-side via Admin SDK
+    }
+    
+    // Webhooks
+    match /webhooks/{webhookId} {
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Usage tracking (read-only for user)
+    match /usageTracking/{trackingId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow write: if false; // Only server-side via Admin SDK
     }
   }
 }

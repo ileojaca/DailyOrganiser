@@ -18,7 +18,7 @@ export interface Goal {
   userId: string
   title: string
   description?: string
-  category: 'work' | 'personal' | 'health' | 'learning' | 'social'
+  category: 'work' | 'personal' | 'health' | 'learning' | 'social' | 'family'
   priority: number
   aiAdjustedPriority: boolean
   adjustmentReason?: string
