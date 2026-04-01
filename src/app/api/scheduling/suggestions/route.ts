@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
 
     // Determine current context based on time of day
     const hour = new Date().getHours();
-    let currentContext: TaskContext = {
+    const currentContext: TaskContext = {
       location: 'home',
       tools: ['computer'],
       networkStatus: 'online',

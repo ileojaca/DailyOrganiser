@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Group tasks by date
-    const scheduledTasks = tasks?.reduce((acc: Array<{ date: string; count: number }>, task: any) => {
+    const scheduledTasks = tasks?.reduce((acc: Array<{ date: string; count: number }>, task: { scheduled_date: string }) => {
       const existing = acc.find(t => t.date === task.scheduled_date);
       if (existing) {
         existing.count++;
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
       return acc;
     }, []) || [];
 
-    let insights: any = {};
+    let insights: Record<string, unknown> = {};
 
     switch (type) {
       case 'overview':
@@ -62,8 +62,8 @@ export async function GET(request: NextRequest) {
           burnoutRisk,
           summary: {
             totalTasks: logs?.length || 0,
-            completedTasks: logs?.filter((l: any) => l.completion_status === 'completed').length || 0,
-            averageEfficiency: logs?.reduce((sum: number, l: any) => sum + (l.efficiency_score || 0), 0) / (logs?.length || 1),
+            completedTasks: logs?.filter((l: { completion_status: string }) => l.completion_status === 'completed').length || 0,
+            averageEfficiency: logs?.reduce((sum: number, l: { efficiency_score?: number }) => sum + (l.efficiency_score || 0), 0) / (logs?.length || 1),
           }
         };
         break;
@@ -134,16 +134,16 @@ export async function POST(request: NextRequest) {
       .gte('scheduled_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
     const recentCompletionRate = recentLogs && recentLogs.length > 0
-      ? recentLogs.filter((l: any) => l.completion_status === 'completed').length / recentLogs.length
+      ? recentLogs.filter((l: { completion_status: string }) => l.completion_status === 'completed').length / recentLogs.length
       : 0.5;
 
     // Calculate streak
-    const sortedLogs = [...(recentLogs || [])].sort((a: any, b: any) => 
+    const sortedLogs = [...(recentLogs || [])].sort((a: { scheduled_date: string }, b: { scheduled_date: string }) => 
       new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime()
     );
     let streakDays = 0;
     for (const log of sortedLogs) {
-      if ((log as any).completion_status === 'completed') {
+      if ((log as { completion_status: string }).completion_status === 'completed') {
         streakDays++;
       } else {
         break;

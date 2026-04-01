@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       goals: goalsData.data || [],
       timeBlocks: timeBlocksData.data || [],
       accomplishmentLogs: logsData.data || [],
-      teams: teamsData.data?.map((tm: any) => tm.teams) || [],
+      teams: teamsData.data?.map((tm: { teams: unknown }) => tm.teams) || [],
       exportedAt: new Date().toISOString(),
     };
 
