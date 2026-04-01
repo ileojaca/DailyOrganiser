@@ -35,7 +35,7 @@ const createMockStripe = (): Stripe => {
 export const stripe: Stripe = !stripeSecretKey || stripeSecretKey === ''
   ? createMockStripe()
   : new Stripe(stripeSecretKey, {
-      apiVersion: '2024-12-18.acacia',
+      apiVersion: '2026-03-25.dahlia',
     });
 
 // Subscription tier definitions

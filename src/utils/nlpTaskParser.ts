@@ -52,7 +52,7 @@ const PRIORITY_KEYWORDS: Record<string, number> = {
 };
 
 // Category keywords
-const CATEGORY_KEYWORDS: Record<string, string> = {
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'work': ['work', 'meeting', 'project', 'deadline', 'client', 'office'],
   'personal': ['personal', 'errand', 'chore', 'home', 'family'],
   'health': ['workout', 'exercise', 'gym', 'run', 'yoga', 'health', 'doctor'],
@@ -75,7 +75,7 @@ const ENERGY_KEYWORDS: Record<number, string[]> = {
 };
 
 // Location keywords
-const LOCATION_KEYWORDS: Record<string, string> = {
+const LOCATION_KEYWORDS: Record<string, string[]> = {
   'home': ['home', 'house', 'from home'],
   'office': ['office', 'workplace', 'at work'],
   'gym': ['gym', 'fitness', 'workout'],
@@ -269,13 +269,13 @@ function extractPriority(input: string): number | undefined {
 /**
  * Extract category from keywords
  */
-function extractCategory(input: string): string | undefined {
+function extractCategory(input: string): 'work' | 'personal' | 'health' | 'learning' | 'social' | undefined {
   const lowerInput = input.toLowerCase();
   
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
     for (const keyword of keywords) {
       if (lowerInput.includes(keyword)) {
-        return category;
+        return category as 'work' | 'personal' | 'health' | 'learning' | 'social';
       }
     }
   }
