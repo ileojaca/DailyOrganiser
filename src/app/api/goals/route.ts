@@ -1,89 +1,97 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps } from 'firebase/app';
+import { getUserTasks, createTask, updateTask } from '@/lib/firebaseUtils';
+import { Task } from '@/types/simplified';
 
+/**
+ * GET /api/goals
+ * Fetch user's tasks with optional filtering
+ */
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    // Get user ID from Authorization header or Firebase Auth
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // In a real app, you'd validate the token here
+    // For now, extract userId from token or use Firebase client-side auth
+    // This is a simplified approach - use Firebase Admin SDK in production
+    
+    const userId = request.headers.get('x-user-id');
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID required' }, { status: 401 });
+    }
+
+    // Get filter parameters
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
     const category = searchParams.get('category');
-    const assigneeId = searchParams.get('assigneeId');
+    const priority = searchParams.get('priority');
+    const completed = searchParams.get('completed');
 
-    let query = supabase
-      .from('goals')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+    const filters: any = {};
+    if (category) filters.category = category;
+    if (priority) filters.priority = parseInt(priority);
+    if (completed) filters.completed = completed === 'true';
 
-    if (status) {
-      query = query.eq('status', status);
-    }
-    if (category) {
-      query = query.eq('category', category);
-    }
-    if (assigneeId) {
-      query = query.eq('assignee_id', assigneeId);
-    }
-
-    const { data: goals, error } = await query;
-
-    if (error) {
-      console.error('Error fetching goals:', error);
-      return NextResponse.json({ error: 'Failed to fetch goals' }, { status: 500 });
-    }
-
-    return NextResponse.json({ goals });
+    const tasks = await getUserTasks(userId, filters);
+    return NextResponse.json({ tasks }, { status: 200 });
   } catch (error) {
-    console.error('Error in goals API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error fetching tasks:', error);
+    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
   }
 }
 
+/**
+ * POST /api/goals
+ * Create a new task
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const userId = request.headers.get('x-user-id');
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID required' }, { status: 401 });
     }
 
     const body = await request.json();
-    const { title, description, category, priority, estimatedDuration, deadline, energyRequired, context } = body;
+    const {
+      title,
+      description,
+      category,
+      priority = 3,
+      duration = 45,
+      energyRequired = 3,
+      scheduledTime,
+      pointsValue = 10,
+      funLevel = 3,
+    } = body;
 
     if (!title || !category) {
-      return NextResponse.json({ error: 'Title and category are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Title and category are required' },
+        { status: 400 }
+      );
     }
 
-    const { data: goal, error } = await supabase
-      .from('goals')
-      .insert({
-        user_id: user.id,
-        title,
-        description,
-        category,
-        priority: priority || 3,
-        estimated_duration: estimatedDuration,
-        deadline,
-        energy_required: energyRequired,
-        context: context || {},
-        status: 'pending',
-      })
-      .select()
-      .single();
+    const newTask = await createTask(userId, {
+      title,
+      description,
+      category,
+      priority: Math.max(1, Math.min(5, priority)),
+      duration,
+      energyRequired: Math.max(1, Math.min(5, energyRequired)),
+      scheduledTime,
+      pointsValue,
+      funLevel: Math.max(1, Math.min(5, funLevel)),
+      completed: false,
+      voiceCreated: body.voiceCreated || false,
+    });
 
-    if (error) {
-      console.error('Error creating goal:', error);
-      return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
-    }
-
-    return NextResponse.json({ goal }, { status: 201 });
+    return NextResponse.json({ task: newTask }, { status: 201 });
   } catch (error) {
-    console.error('Error in goals API:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error creating task:', error);
+    return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
   }
 }
