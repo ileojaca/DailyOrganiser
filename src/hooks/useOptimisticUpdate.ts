@@ -146,9 +146,8 @@ export function useOptimisticTaskStatus(initialTasks: Array<{ id: string; status
     async (taskId: string, newStatus: string, asyncOperation: () => Promise<void>) => {
       await updateItem(taskId, { status: newStatus } as Partial<{ id: string; status: string }>, async () => {
         await asyncOperation();
-        return tasks.map(task =>
-          task.id === taskId ? { ...task, status: newStatus } : task
-        );
+        const updatedTask = tasks.find(task => task.id === taskId);
+        return updatedTask ? { ...updatedTask, status: newStatus } : { id: taskId, status: newStatus };
       });
     },
     [tasks, updateItem]
