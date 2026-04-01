@@ -17,27 +17,6 @@
       ]
     },
     {
-      "collectionGroup": "goals",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "scheduledStart", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "timeBlocks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "startTime", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "accomplishmentLogs",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "scheduledDate", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "accomplishmentLogs",
       "queryScope": "COLLECTION",
       "fields": [
@@ -99,13 +78,6 @@
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "pushSubscriptions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "userId", "order": "ASCENDING" }
       ]
     },
     {
