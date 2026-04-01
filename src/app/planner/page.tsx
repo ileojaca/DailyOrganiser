@@ -92,6 +92,13 @@ export default function PlannerPage() {
           </button>
         </div>
 
+        {/* Help banner */}
+        {timeBlocks.length === 0 && (
+          <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
+            <p className="text-sm text-amber-800"><strong>📅 How it works:</strong> Create time blocks (e.g., "Focus Time", "Team Meetings") and assign them to days. These help organize your week and sync with your goals.</p>
+          </div>
+        )}
+
         {/* Add form */}
         {showForm && (
           <div className="bg-white rounded-2xl border border-gray-200 p-6">

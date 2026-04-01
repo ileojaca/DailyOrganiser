@@ -29,7 +29,7 @@ type SortType = 'priority' | 'scheduled' | 'created';
 
 export default function TaskDashboard() {
   const { user } = useAuth();
-  const { goals, loading, updateGoal, deleteGoal, completeGoal } = useGoals(user?.uid);
+  const { goals, loading, createGoal, updateGoal, deleteGoal, completeGoal } = useGoals(user?.uid);
   const [filter, setFilter] = useState<FilterType>('all');
   const [sortBy, setSortBy] = useState<SortType>('priority');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -66,12 +66,28 @@ export default function TaskDashboard() {
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 
+  const [demoLoading, setDemoLoading] = useState(false);
+
   const stats = {
     total: goals.length,
     pending: goals.filter((g) => g.status === 'pending').length,
     inProgress: goals.filter((g) => g.status === 'in_progress').length,
     completed: goals.filter((g) => g.status === 'completed').length,
     rate: goals.length > 0 ? Math.round((goals.filter((g) => g.status === 'completed').length / goals.length) * 100) : 0,
+  };
+
+  const addDemoGoals = async () => {
+    if (!createGoal) return;
+    setDemoLoading(true);
+    try {
+      await createGoal({ title: 'Buy groceries', category: 'personal', priority: 3, estimatedDuration: 60, energyRequired: 5 });
+      await createGoal({ title: 'Prepare team meeting notes', category: 'work', priority: 4, estimatedDuration: 45, energyRequired: 6 });
+      await createGoal({ title: 'Evening workout', category: 'health', priority: 2, estimatedDuration: 30, energyRequired: 7 });
+    } catch (error) {
+      console.error('Failed to add demo goals', error);
+    } finally {
+      setDemoLoading(false);
+    }
   };
 
   if (loading) {
@@ -148,14 +164,21 @@ export default function TaskDashboard() {
       {/* Task list */}
       <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
         {sorted.length === 0 ? (
-          <div className="text-center py-16 px-6">
+          <div className="text-center py-16 px-6 space-y-3">
             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
             <p className="text-gray-500 text-sm">No goals yet</p>
-            <p className="text-gray-400 text-xs mt-1">Add your first goal to get started</p>
+            <p className="text-gray-400 text-xs">Add your first goal to get started or create demo goals.</p>
+            <button
+              onClick={addDemoGoals}
+              disabled={demoLoading}
+              className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {demoLoading ? 'Adding demo tasks...' : 'Add demo tasks'}
+            </button>
           </div>
         ) : (
           sorted.map((goal) => {

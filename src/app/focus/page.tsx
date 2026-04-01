@@ -76,6 +76,11 @@ export default function FocusPage() {
           <p className="text-gray-500 text-sm mt-1">Stay in the zone with timed focus sessions</p>
         </div>
 
+        {/* Help banner */}
+        <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+          <p className="text-sm text-blue-800"><strong>⏱️ Tip:</strong> Select a task below, choose your focus duration, and hit Start. Mark tasks complete when your session ends.</p>
+        </div>
+
         {/* Goal selector */}
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
           <label className="block text-sm font-medium text-gray-700 mb-2">Working on</label>

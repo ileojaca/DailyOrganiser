@@ -21,14 +21,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { input, createImmediate = false } = body;
+    const { input, text, createImmediate = false } = body;
+    const normalizedInput = typeof input === 'string' ? input : typeof text === 'string' ? text : '';
 
-    if (!input || typeof input !== 'string') {
+    if (!normalizedInput.trim()) {
       return NextResponse.json({ error: 'Input text is required' }, { status: 400 });
     }
 
     // Parse the input
-    const parsed = parseTaskInput(input);
+    const parsed = parseTaskInput(normalizedInput);
 
     if (!parsed.taskTitle) {
       return NextResponse.json(
