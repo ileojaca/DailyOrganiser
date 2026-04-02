@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { collection, addDoc, query, where, orderBy, onSnapshot, updateDoc, doc, Timestamp } from 'firebase/firestore';
 
 interface Habit {
@@ -55,7 +55,7 @@ export default function HabitStreaks() {
 
     // Load habits
     const habitsQuery = query(
-      collection(db, 'habits'),
+      collection(getDb(), 'habits'),
       where('userId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
@@ -75,7 +75,7 @@ export default function HabitStreaks() {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const completionsQuery = query(
-      collection(db, 'habitCompletions'),
+      collection(getDb(), 'habitCompletions'),
       where('userId', '==', user.uid),
       where('completedAt', '>=', Timestamp.fromDate(thirtyDaysAgo)),
       orderBy('completedAt', 'desc')
@@ -100,7 +100,7 @@ export default function HabitStreaks() {
     if (!user?.uid || !newHabit.name.trim()) return;
 
     try {
-      await addDoc(collection(db, 'habits'), {
+      await addDoc(collection(getDb(), 'habits'), {
         userId: user.uid,
         ...newHabit,
         streak: 0,
@@ -138,7 +138,7 @@ export default function HabitStreaks() {
       if (!habit) return;
 
       // Add completion
-      await addDoc(collection(db, 'habitCompletions'), {
+      await addDoc(collection(getDb(), 'habitCompletions'), {
         userId: user.uid,
         habitId,
         completedAt: Timestamp.now(),

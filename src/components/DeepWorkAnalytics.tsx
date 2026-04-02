@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 
 interface FocusSession {
@@ -28,7 +28,7 @@ export default function DeepWorkAnalytics() {
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
     const q = query(
-      collection(db, 'focusSessions'),
+      collection(getDb(), 'focusSessions'),
       where('userId', '==', user.uid),
       where('startTime', '>=', Timestamp.fromDate(startDate)),
       orderBy('startTime', 'desc')

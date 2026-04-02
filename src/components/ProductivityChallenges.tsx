@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, Timestamp } from 'firebase/firestore';
 
 interface Challenge {
@@ -119,7 +119,7 @@ export default function ProductivityChallenges() {
     if (!user?.uid) return;
 
     const q = query(
-      collection(db, 'userChallenges'),
+      collection(getDb(), 'userChallenges'),
       where('userId', '==', user.uid),
       orderBy('startedAt', 'desc')
     );

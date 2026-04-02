@@ -29,6 +29,14 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## DailyOrganiser Features
+
+- Onboarding modal that appears for new users and can be disabled via “Don’t show this again”.
+- Main productivity dashboard includes task planner, goal input, AI suggestions, life metrics, energy tracking, habit streaks, and productivity challenges.
+- Deep Work Analytics for focus sessions and interruption tracking.
+- Firebase backend (goals, energy logs, focus sessions, habits, user challenges) with strict rules and live deploy support.
+- Clean UX for incremental adoption with user preference persistence.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

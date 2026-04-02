@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebase';
+import { getDb } from '@/lib/firebase';
 import { collection, addDoc, query, where, orderBy, onSnapshot, Timestamp } from 'firebase/firestore';
 
 interface EnergyEntry {
@@ -30,7 +30,7 @@ export default function EnergyTracker() {
     if (!user?.uid) return;
 
     const q = query(
-      collection(db, 'energyEntries'),
+      collection(getDb(), 'energyEntries'),
       where('userId', '==', user.uid),
       orderBy('timestamp', 'desc'),
       // Limit to last 7 days
@@ -53,7 +53,7 @@ export default function EnergyTracker() {
     if (!user?.uid) return;
 
     try {
-      await addDoc(collection(db, 'energyEntries'), {
+      await addDoc(collection(getDb(), 'energyEntries'), {
         userId: user.uid,
         level: currentEnergy,
         timestamp: Timestamp.now(),

@@ -18,13 +18,17 @@ export default function Home() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState(0);
   const [demoLoading, setDemoLoading] = useState(false);
+  const [neverShowOnboarding, setNeverShowOnboarding] = useState(false);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const name = profile?.fullName?.split(' ')[0] || 'there';
 
   useEffect(() => {
-    if (goals.length === 0 && !showOnboarding) {
+    const savedPreference = localStorage.getItem('dailyOrganiserNeverShowOnboarding') === 'true';
+    setNeverShowOnboarding(savedPreference);
+
+    if (!savedPreference && goals.length === 0 && !showOnboarding) {
       setShowOnboarding(true);
     }
   }, [goals.length, showOnboarding]);
@@ -71,6 +75,9 @@ export default function Home() {
       setOnboardingStep(onboardingStep + 1);
     } else {
       setShowOnboarding(false);
+      if (neverShowOnboarding) {
+        localStorage.setItem('dailyOrganiserNeverShowOnboarding', 'true');
+      }
     }
   };
 
@@ -152,9 +159,26 @@ export default function Home() {
               </div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">{onboardingSteps[onboardingStep].title}</h2>
               <p className="text-gray-600 mb-6">{onboardingSteps[onboardingStep].content}</p>
+              <div className="mb-4 flex items-center gap-3 text-sm text-gray-600">
+                <input
+                  id="never-show-onboarding"
+                  type="checkbox"
+                  checked={neverShowOnboarding}
+                  onChange={(e) => {
+                    const value = e.target.checked;
+                    setNeverShowOnboarding(value);
+                    localStorage.setItem('dailyOrganiserNeverShowOnboarding', `${value}`);
+                  }}
+                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                />
+                <label htmlFor="never-show-onboarding">Don’t show this again</label>
+              </div>
               <div className="flex gap-3 justify-center">
                 <button
-                  onClick={() => setShowOnboarding(false)}
+                  onClick={() => {
+                    setShowOnboarding(false);
+                    localStorage.setItem('dailyOrganiserNeverShowOnboarding', `${neverShowOnboarding}`);
+                  }}
                   className="px-4 py-2 text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   Skip
