@@ -171,7 +171,7 @@ export default function HabitStreaks() {
         newStreak = weekCompletions >= (habit.targetDays || 1) ? habit.streak + 1 : habit.streak;
       }
 
-      await updateDoc(doc(db, 'habits', habitId), {
+      await updateDoc(doc(getDb(), 'habits', habitId), {
         streak: newStreak,
         lastCompleted: Timestamp.now(),
         totalCompletions: habit.totalCompletions + 1

@@ -144,7 +144,7 @@ export default function ProductivityChallenges() {
     if (existingChallenge) return; // Already active
 
     try {
-      await addDoc(collection(db, 'userChallenges'), {
+      await addDoc(collection(getDb(), 'userChallenges'), {
         challengeId,
         userId: user.uid,
         progress: 0,

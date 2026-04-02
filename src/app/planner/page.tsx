@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import AppShell from '@/components/AppShell';
+import SmartTimeBlocking from '@/components/SmartTimeBlocking';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimeBlocks, TimeBlock } from '@/hooks/useTimeBlocks';
 import { useGoals } from '@/hooks/useGoals';
@@ -239,6 +240,9 @@ export default function PlannerPage() {
             </div>
           </div>
         )}
+
+        {/* Smart Time Blocking */}
+        <SmartTimeBlocking />
 
         {/* Header */}
         <div className="flex items-center justify-between">
