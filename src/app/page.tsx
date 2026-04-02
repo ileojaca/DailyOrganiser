@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell';
 import GoalInput from '@/components/GoalInput';
 import TaskDashboard from '@/components/TaskDashboard';
 import AISuggestions from '@/components/AISuggestions';
+import LifeDashboard from '@/components/LifeDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 
@@ -112,16 +113,21 @@ export default function Home() {
         )}
 
         {/* Main grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
           {/* Left: Goal input + AI suggestions */}
           <div className="xl:col-span-1 space-y-6">
             <GoalInput />
             <AISuggestions />
           </div>
 
-          {/* Right: Task dashboard */}
+          {/* Center: Task dashboard */}
           <div className="xl:col-span-2">
             <TaskDashboard />
+          </div>
+
+          {/* Right: Life dashboard */}
+          <div className="xl:col-span-1">
+            <LifeDashboard />
           </div>
         </div>
       </div>
