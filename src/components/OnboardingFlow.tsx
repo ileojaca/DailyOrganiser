@@ -43,13 +43,31 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       order: 3,
     },
     {
+      id: 'family',
+      title: 'Family goals',
+      description: 'Tell us how your family time should fit into your schedule.',
+      component: 'family',
+      completed: false,
+      optional: true,
+      order: 4,
+    },
+    {
+      id: 'worklife',
+      title: 'Work-life balance',
+      description: 'Set your target work vs rest ratio to keep you healthy.',
+      component: 'worklife',
+      completed: false,
+      optional: true,
+      order: 5,
+    },
+    {
       id: 'goals',
       title: 'Set your first goal',
       description: 'Start with one achievable goal to build momentum.',
       component: 'goals',
       completed: false,
       optional: true,
-      order: 4,
+      order: 6,
     },
     {
       id: 'complete',
@@ -216,6 +234,70 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
                   }}
                   className={`p-4 rounded-lg border text-left transition-colors ${
                     answers.priorities?.includes(option.value)
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300'
+                  }`}
+                >
+                  <p className="font-medium text-gray-900 dark:text-white">{option.label}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{option.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'family':
+        return (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              {step.title}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              {step.description}
+            </p>
+            <div className="space-y-3">
+              {[
+                { value: 'daily', label: 'Daily family check-in', desc: 'Log family activities every day' },
+                { value: 'weekly', label: 'Weekly family review', desc: 'Plan family time weekly' },
+                { value: 'occasional', label: 'Occasional catch-ups', desc: 'Focus mainly on personal habits' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setAnswers({ ...answers, familyPlan: option.value })}
+                  className={`w-full p-4 rounded-lg border text-left transition-colors ${
+                    answers.familyPlan === option.value
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                      : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300'
+                  }`}
+                >
+                  <p className="font-medium text-gray-900 dark:text-white">{option.label}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{option.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'worklife':
+        return (
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              {step.title}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              {step.description}
+            </p>
+            <div className="space-y-3">
+              {[
+                { value: 'balanced', label: 'Balanced 50/50', desc: 'Equally split work and rest' },
+                { value: 'focus', label: 'Focus of the week', desc: 'Higher work focus this week' },
+                { value: 'recovery', label: 'Recovery first', desc: 'Prioritize rest and wellness' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setAnswers({ ...answers, worklifeBalance: option.value })}
+                  className={`w-full p-4 rounded-lg border text-left transition-colors ${
+                    answers.worklifeBalance === option.value
                       ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
                       : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300'
                   }`}

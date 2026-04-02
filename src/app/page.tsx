@@ -9,6 +9,7 @@ import LifeDashboard from '@/components/LifeDashboard';
 import EnergyTracker from '@/components/EnergyTracker';
 import HabitStreaks from '@/components/HabitStreaks';
 import ProductivityChallenges from '@/components/ProductivityChallenges';
+import OnboardingFlow from '@/components/OnboardingFlow';
 import LandingPage from '@/components/LandingPage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
@@ -17,7 +18,6 @@ export default function Home() {
   const { profile, user } = useAuth();
   const { goals, createGoal } = useGoals(user?.uid);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingStep, setOnboardingStep] = useState(0);
   const [demoLoading, setDemoLoading] = useState(false);
   const [neverShowOnboarding, setNeverShowOnboarding] = useState(false);
 
@@ -48,38 +48,10 @@ export default function Home() {
     }
   };
 
-  const onboardingSteps = [
-    {
-      title: 'Welcome to DailyOrganiser!',
-      content: 'Your AI-powered planner to stay productive and balanced. Let\'s get you started.',
-      action: 'Next',
-    },
-    {
-      title: 'Add Your First Goal',
-      content: 'Use the form on the left to add a task. Try the AI input for natural language!',
-      action: 'Next',
-    },
-    {
-      title: 'Plan Your Week',
-      content: 'Visit the Planner page to schedule tasks and see your weekly overview.',
-      action: 'Next',
-    },
-    {
-      title: 'Focus & Track',
-      content: 'Use the Focus timer to work distraction-free and track your accomplishments.',
-      action: 'Get Started',
-    },
-  ];
-
-  const nextStep = () => {
-    if (onboardingStep < onboardingSteps.length - 1) {
-      setOnboardingStep(onboardingStep + 1);
-    } else {
-      setShowOnboarding(false);
-      if (neverShowOnboarding) {
-        localStorage.setItem('dailyOrganiserNeverShowOnboarding', 'true');
-      }
-    }
+  const completeOnboarding = () => {
+    setShowOnboarding(false);
+    setNeverShowOnboarding(true);
+    localStorage.setItem('dailyOrganiserNeverShowOnboarding', 'true');
   };
 
   // If user is not authenticated, show landing page
@@ -125,6 +97,14 @@ export default function Home() {
                 </div>
               </div>
             </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowOnboarding(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
+              >
+                Start Guided Setup
+              </button>
+            </div>
           </div>
         )}
 
@@ -153,59 +133,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Onboarding Modal */}
+      {/* New multi-step onboarding flow */}
       {showOnboarding && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">{onboardingSteps[onboardingStep].title}</h2>
-              <p className="text-gray-600 mb-6">{onboardingSteps[onboardingStep].content}</p>
-              <div className="mb-4 flex items-center gap-3 text-sm text-gray-600">
-                <input
-                  id="never-show-onboarding"
-                  type="checkbox"
-                  checked={neverShowOnboarding}
-                  onChange={(e) => {
-                    const value = e.target.checked;
-                    setNeverShowOnboarding(value);
-                    localStorage.setItem('dailyOrganiserNeverShowOnboarding', `${value}`);
-                  }}
-                  className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                />
-                <label htmlFor="never-show-onboarding">Don’t show this again</label>
-              </div>
-              <div className="flex gap-3 justify-center">
-                <button
-                  onClick={() => {
-                    setShowOnboarding(false);
-                    localStorage.setItem('dailyOrganiserNeverShowOnboarding', `${neverShowOnboarding}`);
-                  }}
-                  className="px-4 py-2 text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Skip
-                </button>
-                <button
-                  onClick={addDemoGoals}
-                  disabled={demoLoading}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {demoLoading ? 'Adding...' : 'Add Demo Tasks'}
-                </button>
-                <button
-                  onClick={nextStep}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                >
-                  {onboardingSteps[onboardingStep].action}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <OnboardingFlow onComplete={completeOnboarding} />
       )}
     </AppShell>
   );
