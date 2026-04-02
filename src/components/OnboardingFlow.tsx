@@ -385,41 +385,58 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   if (!progress) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-8 max-w-lg w-full mx-4">
-        {/* Progress Bar */}
-        <div className="mb-6">
-          <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
-            <span>Step {currentStep + 1} of {steps.length}</span>
-            <span>{Math.round(((currentStep + 1) / steps.length) * 100)}%</span>
-          </div>
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
-            <div
-              className="h-full bg-indigo-600 rounded-full transition-all"
-              style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-            />
-          </div>
-        </div>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 shadow-2xl rounded-2xl overflow-hidden w-full max-w-4xl">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+          <div className="p-8 lg:p-10">
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
+                <span>Step {currentStep + 1} of {steps.length}</span>
+                <span>{Math.round(((currentStep + 1) / steps.length) * 100)}%</span>
+              </div>
+              <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full">
+                <div
+                  className="h-full bg-indigo-500 rounded-full transition-all"
+                  style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                />
+              </div>
+            </div>
 
-        {/* Step Content */}
-        {renderStepContent()}
+            <div className="space-y-6">
+              {renderStepContent()}
+            </div>
 
-        {/* Navigation */}
-        <div className="flex gap-3 mt-8">
-          {steps[currentStep].optional && (
-            <button
-              onClick={skipStep}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Skip
-            </button>
-          )}
-          <button
-            onClick={nextStep}
-            className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-          >
-            {currentStep === steps.length - 1 ? 'Get Started' : 'Continue'}
-          </button>
+            <div className="flex gap-3 mt-8">
+              {steps[currentStep].optional && (
+                <button
+                  onClick={skipStep}
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  Skip
+                </button>
+              )}
+              <button
+                onClick={nextStep}
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              >
+                {currentStep === steps.length - 1 ? 'Get Started' : 'Continue'}
+              </button>
+            </div>
+          </div>
+          <div className="hidden lg:flex items-center justify-center bg-indigo-50 dark:bg-indigo-950 p-8">
+            <div className="text-center">
+              <h3 className="text-xl font-bold text-indigo-700 dark:text-indigo-200 mb-3">Fast setup, actionable results</h3>
+              <p className="text-sm text-indigo-600 dark:text-indigo-300">Answer a few questions and we’ll configure your dashboard for family/work balance and productivity at once.</p>
+              <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-xl border border-indigo-100 dark:border-indigo-900 shadow-sm">
+                <div className="text-left space-y-2">
+                  <p className="text-xs font-semibold uppercase text-indigo-600 dark:text-indigo-400">Next step</p>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{steps[currentStep].title}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{steps[currentStep].description}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
