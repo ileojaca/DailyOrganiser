@@ -5,7 +5,7 @@
  * badges, and streaks to motivate users.
  */
 
-interface Achievement {
+export interface Achievement {
   id: string;
   name: string;
   description: string;
@@ -21,7 +21,7 @@ interface Achievement {
   unlockedAt?: Date;
 }
 
-interface Badge {
+export interface Badge {
   id: string;
   name: string;
   icon: string;
@@ -29,7 +29,7 @@ interface Badge {
   earnedAt: Date;
 }
 
-interface UserProgress {
+export interface UserProgress {
   totalPoints: number;
   currentStreak: number;
   longestStreak: number;

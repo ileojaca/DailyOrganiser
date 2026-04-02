@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals, Goal } from '@/hooks/useGoals';
+import { useGamification } from '@/hooks/useGamification';
 
 const PRIORITY_CONFIG: Record<number, { label: string; color: string; bg: string; border: string }> = {
   1: { label: 'Minimal', color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-200' },
@@ -30,6 +31,7 @@ type SortType = 'priority' | 'scheduled' | 'created';
 export default function TaskDashboard() {
   const { user } = useAuth();
   const { goals, loading, createGoal, updateGoal, deleteGoal, completeGoal } = useGoals(user?.uid);
+  const { awardPoints, checkAchievements, updateStreak } = useGamification();
   const [filter, setFilter] = useState<FilterType>('all');
   const [sortBy, setSortBy] = useState<SortType>('priority');
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -41,6 +43,14 @@ export default function TaskDashboard() {
       await updateGoal(goal.id, { status: 'in_progress' });
     } else if (goal.status === 'in_progress') {
       await completeGoal(goal.id);
+      // Award points for completing task
+      const points = goal.priority * 10; // Higher priority = more points
+      await awardPoints(points, `Completed task: ${goal.title}`);
+      await updateStreak(true); // Update streak for completion
+      
+      // Check achievements based on completed tasks
+      const completedCount = goals.filter(g => g.status === 'completed').length + 1;
+      await checkAchievements({ tasks_completed: completedCount });
     }
   };
 

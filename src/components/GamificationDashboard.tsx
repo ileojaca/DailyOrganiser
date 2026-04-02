@@ -2,88 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import type { GamificationProfile, Achievement, Badge } from '@/types/lifeManagement';
+import { useGamification } from '@/hooks/useGamification';
+import type { Achievement, Badge } from '@/utils/gamificationEngine';
 
 export default function GamificationDashboard() {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<GamificationProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { progress, loading } = useGamification();
   const [activeTab, setActiveTab] = useState<'overview' | 'achievements' | 'badges'>('overview');
 
-  useEffect(() => {
-    if (!user) return;
-
-    // Load from localStorage
-    const saved = localStorage.getItem(`gamification_${user.uid}`);
-    if (saved) {
-      setProfile(JSON.parse(saved));
-    } else {
-      // Create sample profile
-      const sampleProfile: GamificationProfile = {
-        userId: user.uid,
-        totalPoints: 1250,
-        currentStreak: 7,
-        longestStreak: 21,
-        level: 5,
-        achievements: [
-          {
-            id: 'ach_1',
-            name: 'Early Bird',
-            description: 'Complete 5 tasks before 9 AM',
-            icon: '🌅',
-            unlockedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-            points: 100,
-          },
-          {
-            id: 'ach_2',
-            name: 'Family First',
-            description: 'Log 10 family activities',
-            icon: '👨‍👩‍👧‍👦',
-            unlockedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-            points: 150,
-          },
-          {
-            id: 'ach_3',
-            name: 'Zen Master',
-            description: 'Complete 7 meditation sessions',
-            icon: '🧘',
-            unlockedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-            points: 200,
-          },
-        ],
-        badges: [
-          {
-            id: 'badge_1',
-            name: 'Week Warrior',
-            icon: '⚔️',
-            earnedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          },
-          {
-            id: 'badge_2',
-            name: 'Sleep Champion',
-            icon: '😴',
-            earnedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-          },
-        ],
-        updatedAt: new Date(),
-      };
-      setProfile(sampleProfile);
-      localStorage.setItem(`gamification_${user.uid}`, JSON.stringify(sampleProfile));
-    }
-    setLoading(false);
-  }, [user]);
-
   const getLevelProgress = () => {
-    if (!profile) return 0;
-    const pointsForCurrentLevel = (profile.level - 1) * 500;
-    const pointsForNextLevel = profile.level * 500;
-    const progress = ((profile.totalPoints - pointsForCurrentLevel) / (pointsForNextLevel - pointsForCurrentLevel)) * 100;
-    return Math.min(100, Math.max(0, progress));
+    if (!progress) return 0;
+    const pointsForCurrentLevel = (progress.level - 1) * 500;
+    const pointsForNextLevel = progress.level * 500;
+    const progressPercent = ((progress.totalPoints - pointsForCurrentLevel) / (pointsForNextLevel - pointsForCurrentLevel)) * 100;
+    return Math.min(100, Math.max(0, progressPercent));
   };
 
   const getPointsToNextLevel = () => {
-    if (!profile) return 0;
-    return (profile.level * 500) - profile.totalPoints;
+    if (!progress) return 0;
+    return (progress.level * 500) - progress.totalPoints;
   };
 
   if (loading) {
@@ -101,7 +38,7 @@ export default function GamificationDashboard() {
     );
   }
 
-  if (!profile) return null;
+  if (!progress) return null;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
@@ -127,7 +64,7 @@ export default function GamificationDashboard() {
               : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
           }`}
         >
-          Achievements ({profile.achievements.length})
+          Achievements ({progress?.achievements.length || 0})
         </button>
         <button
           onClick={() => setActiveTab('badges')}
@@ -137,7 +74,7 @@ export default function GamificationDashboard() {
               : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
           }`}
         >
-          Badges ({profile.badges.length})
+          Badges ({progress?.badges.length || 0})
         </button>
       </div>
 
@@ -148,7 +85,7 @@ export default function GamificationDashboard() {
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
               <p className="text-sm opacity-80">Level</p>
-              <p className="text-3xl font-bold">{profile.level}</p>
+              <p className="text-3xl font-bold">{progress?.level || 1}</p>
               <div className="mt-2">
                 <div className="w-full h-2 bg-white/20 rounded-full">
                   <div
@@ -164,7 +101,7 @@ export default function GamificationDashboard() {
             <div className="p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
               <p className="text-sm text-gray-600 dark:text-gray-400">Total Points</p>
               <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-                {profile.totalPoints.toLocaleString()}
+                {progress?.totalPoints.toLocaleString() || 0}
               </p>
             </div>
           </div>
@@ -175,7 +112,7 @@ export default function GamificationDashboard() {
               <p className="text-sm text-gray-600 dark:text-gray-400">Current Streak</p>
               <div className="flex items-baseline gap-1">
                 <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">
-                  {profile.currentStreak}
+                  {progress?.currentStreak || 0}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">days</p>
               </div>
@@ -184,7 +121,7 @@ export default function GamificationDashboard() {
               <p className="text-sm text-gray-600 dark:text-gray-400">Longest Streak</p>
               <div className="flex items-baseline gap-1">
                 <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                  {profile.longestStreak}
+                  {progress?.longestStreak || 0}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">days</p>
               </div>
@@ -197,7 +134,7 @@ export default function GamificationDashboard() {
               Recent Achievements
             </h3>
             <div className="space-y-2">
-              {profile.achievements.slice(0, 3).map((achievement) => (
+              {progress?.achievements.filter((a: Achievement) => a.unlocked).slice(0, 3).map((achievement: Achievement) => (
                 <div
                   key={achievement.id}
                   className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
@@ -218,7 +155,7 @@ export default function GamificationDashboard() {
                       +{achievement.points}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {new Date(achievement.unlockedAt).toLocaleDateString()}
+                      {achievement.unlockedAt ? new Date(achievement.unlockedAt).toLocaleDateString() : 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -231,7 +168,7 @@ export default function GamificationDashboard() {
       {/* Achievements Tab */}
       {activeTab === 'achievements' && (
         <div className="space-y-3">
-          {profile.achievements.map((achievement) => (
+          {progress?.achievements.filter((a: Achievement) => a.unlocked).map((achievement: Achievement) => (
             <div
               key={achievement.id}
               className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
@@ -242,7 +179,7 @@ export default function GamificationDashboard() {
                   <p className="font-medium text-gray-900 dark:text-white">{achievement.name}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{achievement.description}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    Unlocked: {new Date(achievement.unlockedAt).toLocaleDateString()}
+                    Unlocked: {achievement.unlockedAt ? new Date(achievement.unlockedAt).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
               </div>
@@ -260,7 +197,7 @@ export default function GamificationDashboard() {
       {/* Badges Tab */}
       {activeTab === 'badges' && (
         <div className="grid grid-cols-2 gap-4">
-          {profile.badges.map((badge) => (
+          {progress?.badges.map((badge: Badge) => (
             <div
               key={badge.id}
               className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-lg text-center"
