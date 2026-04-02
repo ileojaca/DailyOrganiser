@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 type Mode = 'signin' | 'signup' | 'reset';
@@ -9,14 +9,32 @@ type Mode = 'signin' | 'signup' | 'reset';
 export default function AuthPage() {
   const { signIn, signUp, signInWithGoogle, resetPassword, sendVerificationEmail, error: authError } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    const intended = searchParams.get('mode');
+    if (intended === 'signup' || intended === 'signin' || intended === 'reset') {
+      setMode(intended as Mode);
+    }
+  }, [searchParams]);
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
+  const [modeNotification, setModeNotification] = useState<'signin' | 'signup' | null>(null);
+
+  // Show notification when URL mode changes
+  useEffect(() => {
+    if (mode === 'signin' || mode === 'signup') {
+      setModeNotification(mode);
+      const timer = setTimeout(() => setModeNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,18 +104,36 @@ export default function AuthPage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
+          {/* Mode notification toast */}
+          {modeNotification && (
+            <div className="mb-6 flex items-center gap-2 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-700 animate-fade-in">
+              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span>{modeNotification === 'signin' ? 'Ready to sign in to your account' : 'Ready to create your new account'}</span>
+            </div>
+          )}
+
           {/* Tab switcher */}
           {mode !== 'reset' && (
             <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
               <button
                 onClick={() => setMode('signin')}
-                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === 'signin' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all ${
+                  mode === 'signin'
+                    ? 'bg-white shadow-md text-indigo-600 border-b-2 border-indigo-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
                 Sign In
               </button>
               <button
                 onClick={() => setMode('signup')}
-                className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${mode === 'signup' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all ${
+                  mode === 'signup'
+                    ? 'bg-white shadow-md text-indigo-600 border-b-2 border-indigo-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
                 Sign Up
               </button>

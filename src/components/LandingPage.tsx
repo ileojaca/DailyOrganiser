@@ -106,8 +106,12 @@ export default function LandingPage() {
     }
   ];
 
-  const handleGetStarted = () => {
-    router.push('/auth');
+  const handleSignIn = () => {
+    router.push('/auth?mode=signin');
+  };
+
+  const handleSignUp = () => {
+    router.push('/auth?mode=signup');
   };
 
   const handleWaitlist = () => {
@@ -128,14 +132,17 @@ export default function LandingPage() {
               <span className="text-xl font-bold text-gray-900">DailyOrganiser</span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link href="/auth" className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">
-                Sign In
-              </Link>
               <button
-                onClick={handleGetStarted}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                onClick={handleSignIn}
+                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
-                Get Started
+                Sign In
+              </button>
+              <button
+                onClick={handleSignUp}
+                className="text-indigo-600 border border-indigo-400 hover:bg-indigo-50 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Sign Up
               </button>
             </div>
           </div>
@@ -156,7 +163,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
               <button
-                onClick={handleGetStarted}
+                onClick={handleSignUp}
                 className="bg-indigo-600 text-white px-8 py-4 rounded-lg text-lg font-medium hover:bg-indigo-700 transition-colors shadow-lg"
               >
                 Start Free Trial
@@ -338,7 +345,7 @@ export default function LandingPage() {
                   </ul>
 
                   <button
-                    onClick={plan.name === 'Free' ? handleGetStarted : plan.name === 'Team' ? handleWaitlist : handleGetStarted}
+                    onClick={plan.name === 'Team' ? handleWaitlist : handleSignUp}
                     className={`w-full py-3 px-6 rounded-lg font-medium transition-colors ${
                       plan.popular
                         ? 'bg-indigo-600 text-white hover:bg-indigo-700'
@@ -365,7 +372,7 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={handleGetStarted}
+              onClick={handleSignUp}
               className="bg-white text-indigo-600 px-8 py-4 rounded-lg text-lg font-medium hover:bg-gray-50 transition-colors shadow-lg"
             >
               Start Your Free Trial

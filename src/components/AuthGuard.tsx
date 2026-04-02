@@ -11,7 +11,10 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!loading) {
-      if (!user && pathname !== '/auth') {
+      const publicPaths = new Set(['/auth', '/']);
+
+      // Unauthenticated users may view '/', '/auth' and future marketing pages safely.
+      if (!user && !publicPaths.has(pathname)) {
         router.replace('/auth');
       } else if (user && pathname === '/auth') {
         router.replace('/');
