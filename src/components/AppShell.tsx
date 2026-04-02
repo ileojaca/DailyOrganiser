@@ -63,18 +63,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-background flex">
       {/* Sidebar - desktop */}
-      <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-gray-200 fixed inset-y-0 z-30">
+      <aside className="hidden lg:flex flex-col w-64 bg-background border-r border-gray-200 dark:border-gray-700 fixed inset-y-0 z-30">
         {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+        <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+          <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center flex-shrink-0">
             <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
           </div>
           <div>
-            <p className="font-bold text-gray-900 text-sm">DailyOrganiser</p>
+            <p className="font-bold text-foreground text-sm">DailyOrganiser</p>
             <p className="text-xs text-gray-400">AI Planner</p>
           </div>
         </div>
@@ -88,10 +88,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 title={item.desc}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${
+                style={
                   active
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? {
+                        backgroundColor: 'rgba(var(--accent-color-rgb), 0.12)',
+                        color: 'var(--accent-color)',
+                        borderLeft: '3px solid var(--accent-color)',
+                        fontWeight: 600
+                      }
+                    : {}
+                }
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group relative ${
+                  active ? '' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-100'
                 }`}
               >
                 {item.icon}
@@ -105,18 +113,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* User */}
         <div className="px-3 py-4 border-t border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-3 px-3 py-2 rounded-lg">
-            <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-full flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-semibold text-sm flex-shrink-0">
+            <div className="w-8 h-8 bg-accent/10 dark:bg-accent/20 rounded-full flex items-center justify-center text-accent dark:text-accent font-semibold text-sm flex-shrink-0">
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{profile?.fullName || 'User'}</p>
+              <p className="text-sm font-medium text-foreground truncate">{profile?.fullName || 'User'}</p>
               <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user?.email}</p>
             </div>
             <div className="flex items-center gap-2">
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as 'light' | 'dark' | 'system')}
-                className="text-xs p-1 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
+                className="text-xs p-1 border border-gray-300 dark:border-gray-600 rounded-md bg-background text-foreground"
                 aria-label="Theme mode"
               >
                 <option value="light">Light</option>
@@ -126,7 +134,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <select
                 value={accentColor}
                 onChange={(e) => setAccentColor(e.target.value)}
-                className="text-xs p-1 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
+                className="text-xs p-1 border border-gray-300 dark:border-gray-600 rounded-md bg-background text-foreground"
                 aria-label="Accent color"
               >
                 <option value="#4F46E5">Indigo</option>
@@ -145,14 +153,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200 flex items-center justify-between px-4 py-3 safe-area-top">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-background border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 py-3 safe-area-top">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
+          <div className="w-7 h-7 bg-accent rounded-lg flex items-center justify-center">
             <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
           </div>
-          <span className="font-bold text-gray-900 text-sm">DailyOrganiser</span>
+          <span className="font-bold text-foreground text-sm">DailyOrganiser</span>
         </div>
         <div className="flex items-center gap-2">
           <NotificationCenter />
@@ -172,7 +180,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile nav overlay */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-30 bg-black/40" onClick={() => setMobileOpen(false)}>
-          <div className="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute left-0 top-0 bottom-0 w-72 max-w-[85vw] bg-background shadow-xl" onClick={(e) => e.stopPropagation()}>
             <nav className="pt-16 px-3 py-4 space-y-1 overflow-y-auto h-full" aria-label="Mobile navigation">
               {NAV_ITEMS.map((item) => {
                 const active = pathname === item.href;
@@ -183,7 +191,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     onClick={() => setMobileOpen(false)}
                     aria-current={active ? 'page' : undefined}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                      active ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
+                      active ? 'bg-accent/10 text-accent' : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800 dark:active:bg-gray-700'
                     }`}
                   >
                     {item.icon}

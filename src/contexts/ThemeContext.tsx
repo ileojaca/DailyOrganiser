@@ -46,19 +46,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mediaQuery.removeEventListener('change', updateResolvedMode);
   }, [mode]);
 
+  const hexToRgb = (hex: string) => {
+    const normalizedHex = hex.replace('#', '');
+    const bigint = parseInt(normalizedHex, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `${r}, ${g}, ${b}`;
+  };
+
   useEffect(() => {
     // Apply theme to document
     const root = document.documentElement;
-    
+
     if (resolvedMode === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-    
+
     // Apply accent color as CSS variable
     root.style.setProperty('--accent-color', accentColor);
-    
+    root.style.setProperty('--accent-color-rgb', hexToRgb(accentColor));
+
     // Save to localStorage
     localStorage.setItem('theme-mode', mode);
     localStorage.setItem('theme-accent', accentColor);
