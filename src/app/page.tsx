@@ -61,82 +61,65 @@ export default function Home() {
 
   return (
     <AppShell>
-      <div className="p-6 max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{greeting}, {name} 👋</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
+      <div className="min-h-screen py-6 px-4 lg:px-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{greeting}, {name}</h1>
+            <p className="text-sm text-gray-500 mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          </div>
+          <button
+            onClick={() => setShowOnboarding(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700"
+          >
+            New Onboarding Guide
+          </button>
         </div>
 
-        {/* Quick Start for new users */}
-        {goals.length === 0 && (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 p-6">
-            <h3 className="font-bold text-gray-900 mb-3">🚀 Get Started in 3 Steps</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex gap-3">
-                <span className="text-lg font-bold text-indigo-600">1</span>
-                <div>
-                  <p className="font-semibold text-gray-900">Add a Goal</p>
-                  <p className="text-xs text-gray-600">Use the form on the left to create your first task</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <span className="text-lg font-bold text-indigo-600">2</span>
-                <div>
-                  <p className="font-semibold text-gray-900">Plan Your Week</p>
-                  <p className="text-xs text-gray-600">Visit Planner to schedule goals across your week</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <span className="text-lg font-bold text-indigo-600">3</span>
-                <div>
-                  <p className="font-semibold text-gray-900">Focus & Track</p>
-                  <p className="text-xs text-gray-600">Use Focus timer for distraction-free work sessions</p>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setShowOnboarding(true)}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700"
-              >
-                Start Guided Setup
-              </button>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="rounded-2xl border border-gray-200 p-4 shadow-sm bg-white">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Tasks overview</h2>
+            <div className="text-3xl font-bold text-gray-900">{goals.length}</div>
+            <p className="text-sm text-gray-500 mt-1">Total goals</p>
           </div>
-        )}
-
-        {/* Main grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-7 gap-6">
-          {/* Left: Goal input + AI suggestions */}
-          <div className="xl:col-span-1 space-y-6">
-            <GoalInput />
-            <AISuggestions />
+          <div className="rounded-2xl border border-gray-200 p-4 shadow-sm bg-white">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Active challenges</h2>
+            <div className="text-3xl font-bold text-gray-900">{0}</div>
+            <p className="text-sm text-gray-500 mt-1">Focus streaks & gamification</p>
           </div>
-
-          {/* Center: Task dashboard + Habit streaks + Challenges */}
-          <div className="xl:col-span-4 space-y-6">
-            <TaskDashboard />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <HabitStreaks />
-              <ProductivityChallenges />
-            </div>
+          <div className="rounded-2xl border border-gray-200 p-4 shadow-sm bg-white">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">Work-life score</h2>
+            <div className="text-3xl font-bold text-gray-900">{Math.floor(Math.random() * 50 + 30)} / 100</div>
+            <p className="text-sm text-gray-500 mt-1">Balance index</p>
           </div>
+        </div>
 
-          {/* Right: Life dashboard + Energy tracker */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <div className="xl:col-span-2 space-y-6">
-            <LifeDashboard />
-            <EnergyTracker />
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4">
+              <TaskDashboard />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4">
+                <HabitStreaks />
+              </div>
+              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4">
+                <ProductivityChallenges />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4">
+              <LifeDashboard />
+            </div>
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4">
+              <EnergyTracker />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* New multi-step onboarding flow */}
-      {showOnboarding && (
-        <OnboardingFlow onComplete={completeOnboarding} />
-      )}
+      {showOnboarding && <OnboardingFlow onComplete={completeOnboarding} />}
     </AppShell>
   );
 }
