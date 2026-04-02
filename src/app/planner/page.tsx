@@ -4,6 +4,8 @@ import { useState } from 'react';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimeBlocks, TimeBlock } from '@/hooks/useTimeBlocks';
+import { useGoals } from '@/hooks/useGoals';
+import { AdaptiveScheduler } from '@/utils/adaptiveScheduler';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -32,10 +34,15 @@ const EMPTY_FORM = {
 export default function PlannerPage() {
   const { user } = useAuth();
   const { timeBlocks, loading, createTimeBlock, deleteTimeBlock } = useTimeBlocks(user?.uid);
+  const { goals, loading: goalsLoading } = useGoals(user?.uid);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleInfo, setScheduleInfo] = useState<string>('');
+  const [scheduledCount, setScheduledCount] = useState(0);
+  const [unscheduledCount, setUnscheduledCount] = useState(0);
 
   const toggleDay = (day: number) => {
     setForm((f) => ({
@@ -72,6 +79,91 @@ export default function PlannerPage() {
     timeBlocks.filter((b) => b.daysOfWeek.includes(dayIdx))
   );
 
+  const formatTime = (date: Date) => {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const autoScheduleGoals = async () => {
+    if (!goals || goals.length === 0) {
+      setScheduleInfo('No goals available to schedule.');
+      return;
+    }
+
+    const pendingGoals = goals.filter((goal) => goal.status !== 'completed');
+    if (pendingGoals.length === 0) {
+      setScheduleInfo('All goals are completed; nothing to schedule.');
+      return;
+    }
+
+    setScheduling(true);
+    setScheduleInfo('Generating AI schedule...');
+    const scheduler = new AdaptiveScheduler();
+
+    const tasks = pendingGoals.map((goal) => ({
+      id: goal.id,
+      title: goal.title,
+      estimatedDuration: goal.estimatedDuration || 60,
+      priority: (goal.priority >= 4 ? 'high' : goal.priority >= 2 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
+      category: goal.category,
+      energyRequired: (
+        goal.energyRequired && goal.energyRequired >= 7
+          ? 'high'
+          : goal.energyRequired && goal.energyRequired >= 4
+          ? 'medium'
+          : 'low'
+      ) as 'high' | 'medium' | 'low',
+      deadline: goal.deadline,
+    }));
+
+    const availableSlots = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(today);
+      day.setDate(today.getDate() + i);
+      availableSlots.push(...scheduler.generateDaySlots(day, 'intermediate'));
+    }
+
+    const plan = scheduler.schedule(tasks, availableSlots, {
+      bufferTime: 15,
+      maxTasksPerDay: 3,
+      preferredWorkHours: { start: 9, end: 17 },
+    });
+
+    let scheduled = 0;
+    for (const item of plan.scheduledTasks) {
+      const goal = pendingGoals.find((g) => g.id === item.task.id);
+      if (!goal) continue;
+      const startTime = item.startTime;
+      const endTime = item.endTime;
+      const energyLevel = (goal.energyRequired && goal.energyRequired >= 7 ? 'high' : goal.energyRequired && goal.energyRequired >= 4 ? 'medium' : 'low') as 'high' | 'medium' | 'low';
+      const blockInput = {
+        name: `${goal.title} (AI)`,
+        blockType: 'flexible' as const,
+        startTime: formatTime(startTime),
+        endTime: formatTime(endTime),
+        daysOfWeek: [startTime.getDay()],
+        energyLevel,
+        isProtected: false,
+      };
+      try {
+        await createTimeBlock(blockInput);
+        scheduled += 1;
+      } catch (error) {
+        console.error('Failed to create AI time block', blockInput, error);
+      }
+    }
+
+    setScheduledCount(scheduled);
+    setUnscheduledCount(plan.unscheduledTasks.length);
+    setScheduleInfo(
+      `AI-scheduled ${scheduled} tasks. ${plan.unscheduledTasks.length} tasks could not be scheduled (${plan.suggestions.join(' ')})`
+    );
+    setScheduling(false);
+  };
+
   return (
     <AppShell>
       <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -98,6 +190,25 @@ export default function PlannerPage() {
             <p className="text-sm text-amber-800"><strong>📅 How it works:</strong> Create time blocks (e.g., "Focus Time", "Team Meetings") and assign them to days. These help organize your week and sync with your goals.</p>
           </div>
         )}
+
+        {/* AI auto schedule section */}
+        <div className="bg-green-50 rounded-xl border border-green-200 p-4 mb-4">
+          <p className="text-sm text-green-700">Use AI Auto-Schedule to map your current goals into this week’s calendar.</p>
+          <div className="mt-3 flex gap-2 items-center">
+            <button
+              onClick={autoScheduleGoals}
+              disabled={scheduling || (goalsLoading && loading)}
+              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40"
+            >
+              {scheduling ? 'Scheduling...' : 'AI Auto-Schedule Goals'}
+            </button>
+            <span className="text-xs text-gray-600">
+              {scheduledCount > 0 && `Scheduled: ${scheduledCount}`}
+              {unscheduledCount > 0 && ` | Unscheduled: ${unscheduledCount}`}
+            </span>
+          </div>
+          {scheduleInfo && <p className="text-xs mt-2 text-green-800">{scheduleInfo}</p>}
+        </div>
 
         {/* Add form */}
         {showForm && (
