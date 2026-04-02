@@ -418,7 +418,7 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
               )}
               <button
                 onClick={nextStep}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                className="flex-1 px-4 py-2 btn-accent rounded-lg"
               >
                 {currentStep === steps.length - 1 ? 'Get Started' : 'Continue'}
               </button>

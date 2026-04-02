@@ -44,7 +44,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, signOut } = useAuth();
-  const { mode, setMode, resolvedMode } = useTheme();
+  const { mode, setMode, resolvedMode, accentColor, setAccentColor } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -112,17 +112,29 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{profile?.fullName || 'User'}</p>
               <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{user?.email}</p>
             </div>
-            <button onClick={toggleTheme} title="Toggle theme" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-              {resolvedMode === 'dark' ? (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              ) : (
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as 'light' | 'dark' | 'system')}
+                className="text-xs p-1 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
+                aria-label="Theme mode"
+              >
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="system">System</option>
+              </select>
+              <select
+                value={accentColor}
+                onChange={(e) => setAccentColor(e.target.value)}
+                className="text-xs p-1 border border-gray-300 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
+                aria-label="Accent color"
+              >
+                <option value="#4F46E5">Indigo</option>
+                <option value="#059669">Emerald</option>
+                <option value="#D97706">Amber</option>
+                <option value="#DB2777">Fuchsia</option>
+              </select>
+            </div>
             <button onClick={handleSignOut} title="Sign out" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
