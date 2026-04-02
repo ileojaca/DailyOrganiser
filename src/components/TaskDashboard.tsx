@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals, Goal } from '@/hooks/useGoals';
 import { useGamification } from '@/hooks/useGamification';
+import { CheckCircle, Circle, Clock, Zap, Target, Award, TrendingUp, Plus, Trash2 } from 'lucide-react';
 
 const PRIORITY_CONFIG: Record<number, { label: string; color: string; bg: string; border: string }> = {
   1: { label: 'Minimal', color: 'text-gray-600', bg: 'bg-gray-50', border: 'border-gray-200' },
@@ -43,14 +44,9 @@ export default function TaskDashboard() {
       await updateGoal(goal.id, { status: 'in_progress' });
     } else if (goal.status === 'in_progress') {
       await completeGoal(goal.id);
-      // Award points for completing task
-      const points = goal.priority * 10; // Higher priority = more points
+      const points = goal.priority * 10;
       await awardPoints(points, `Completed task: ${goal.title}`);
-      await updateStreak(true); // Update streak for completion
-      
-      // Check achievements based on completed tasks
-      const completedCount = goals.filter(g => g.status === 'completed').length + 1;
-      await checkAchievements({ tasks_completed: completedCount });
+      await updateStreak(true);
     }
   };
 
@@ -76,8 +72,6 @@ export default function TaskDashboard() {
     return b.createdAt.getTime() - a.createdAt.getTime();
   });
 
-  const [demoLoading, setDemoLoading] = useState(false);
-
   const stats = {
     total: goals.length,
     pending: goals.filter((g) => g.status === 'pending').length,
@@ -86,74 +80,67 @@ export default function TaskDashboard() {
     rate: goals.length > 0 ? Math.round((goals.filter((g) => g.status === 'completed').length / goals.length) * 100) : 0,
   };
 
-  const addDemoGoals = async () => {
-    if (!createGoal) return;
-    setDemoLoading(true);
-    try {
-      await createGoal({ title: 'Buy groceries', category: 'personal', priority: 3, estimatedDuration: 60, energyRequired: 5 });
-      await createGoal({ title: 'Prepare team meeting notes', category: 'work', priority: 4, estimatedDuration: 45, energyRequired: 6 });
-      await createGoal({ title: 'Evening workout', category: 'health', priority: 2, estimatedDuration: 30, energyRequired: 7 });
-    } catch (error) {
-      console.error('Failed to add demo goals', error);
-    } finally {
-      setDemoLoading(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4 animate-pulse">
-        <div className="h-6 bg-gray-200 rounded w-1/3" />
+      <div className="card-style p-6 space-y-4 animate-pulse">
+        <div className="h-6 bg-muted rounded w-1/3" />
         <div className="grid grid-cols-4 gap-3">
-          {[...Array(4)].map((_, i) => <div key={i} className="h-20 bg-gray-100 rounded-xl" />)}
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-20 bg-muted rounded-xl" />
+          ))}
         </div>
         <div className="space-y-3">
-          {[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-gray-100 rounded-xl" />)}
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-20 bg-muted rounded-xl" />
+          ))}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+    <div className="card-style overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-border flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Task Dashboard</h2>
-          <p className="text-gray-500 text-xs mt-0.5">Track and manage your goals</p>
+          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+            <Target className="w-5 h-5 text-accent" />
+            Task Dashboard
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1">Track and manage your goals</p>
         </div>
-        <span className="text-xs text-gray-400">{goals.length} total</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">{goals.length} total</span>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-3 p-4 border-b border-gray-100">
-        <div className="bg-gray-50 rounded-xl p-3 text-center">
-          <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-          <p className="text-xs text-gray-500">Total</p>
-        </div>
-        <div className="bg-blue-50 rounded-xl p-3 text-center">
-          <p className="text-xl font-bold text-blue-700">{stats.inProgress}</p>
-          <p className="text-xs text-blue-500">Active</p>
-        </div>
-        <div className="bg-yellow-50 rounded-xl p-3 text-center">
-          <p className="text-xl font-bold text-yellow-700">{stats.pending}</p>
-          <p className="text-xs text-yellow-500">Pending</p>
-        </div>
-        <div className="bg-green-50 rounded-xl p-3 text-center">
-          <p className="text-xl font-bold text-green-700">{stats.rate}%</p>
-          <p className="text-xs text-green-500">Done</p>
-        </div>
+      <div className="grid grid-cols-4 gap-3 p-4 border-b border-border">
+        {[
+          { label: 'Total', value: stats.total, icon: Target, color: 'text-foreground', bg: 'bg-muted' },
+          { label: 'Active', value: stats.inProgress, icon: Zap, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950' },
+          { label: 'Pending', value: stats.pending, icon: Clock, color: 'text-yellow-600', bg: 'bg-yellow-50 dark:bg-yellow-950' },
+          { label: 'Done', value: `${stats.rate}%`, icon: Award, color: 'text-green-600', bg: 'bg-green-50 dark:bg-green-950' },
+        ].map((stat) => (
+          <div key={stat.label} className={`${stat.bg} card-style p-3 text-center`}>
+            <stat.icon className={`w-5 h-5 ${stat.color} mx-auto mb-1`} />
+            <p className={`text-xl font-bold ${stat.color}`}>{stat.value}</p>
+            <p className="text-xs text-muted-foreground">{stat.label}</p>
+          </div>
+        ))}
       </div>
 
       {/* Filters */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 gap-3 flex-wrap">
-        <div className="flex gap-1.5">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border gap-3 flex-wrap">
+        <div className="flex gap-2">
           {(['all', 'pending', 'in_progress', 'completed'] as FilterType[]).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                filter === f ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                filter === f
+                  ? 'bg-accent text-accent-foreground shadow-sm'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               {f === 'all' ? 'All' : f === 'in_progress' ? 'Active' : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -163,7 +150,7 @@ export default function TaskDashboard() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as SortType)}
-          className="px-3 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-600 focus:ring-2 focus:ring-indigo-500 bg-white"
+          className="px-4 py-2 rounded-lg border border-border text-sm text-foreground focus:ring-2 focus:ring-accent bg-background"
         >
           <option value="priority">Sort: Priority</option>
           <option value="scheduled">Sort: Scheduled</option>
@@ -172,23 +159,14 @@ export default function TaskDashboard() {
       </div>
 
       {/* Task list */}
-      <div className="divide-y divide-gray-50 max-h-[600px] overflow-y-auto">
+      <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
         {sorted.length === 0 ? (
-          <div className="text-center py-16 px-6 space-y-3">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
+          <div className="text-center py-16 px-6 space-y-4">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <Target className="w-8 h-8 text-muted-foreground" />
             </div>
-            <p className="text-gray-500 text-sm">No goals yet</p>
-            <p className="text-gray-400 text-xs">Add your first goal to get started or create demo goals.</p>
-            <button
-              onClick={addDemoGoals}
-              disabled={demoLoading}
-              className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {demoLoading ? 'Adding demo tasks...' : 'Add demo tasks'}
-            </button>
+            <p className="text-muted-foreground text-sm">No goals yet</p>
+            <p className="text-muted-foreground/70 text-xs">Add your first goal to get started.</p>
           </div>
         ) : (
           sorted.map((goal) => {
@@ -199,35 +177,34 @@ export default function TaskDashboard() {
             return (
               <div
                 key={goal.id}
-                className={`px-5 py-4 hover:bg-gray-50 transition-colors group ${isCompleted ? 'opacity-60' : ''}`}
+                className={`px-5 py-4 hover:bg-muted/50 transition-colors group ${isCompleted ? 'opacity-60' : ''}`}
               >
                 <div className="flex items-start gap-3">
                   {/* Status circle */}
                   <button
                     onClick={() => handleStatusToggle(goal)}
-                    className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                    className={`flex-shrink-0 mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
                       isCompleted
                         ? 'bg-green-500 border-green-500 text-white'
                         : goal.status === 'in_progress'
-                        ? 'border-blue-400 bg-blue-50'
-                        : 'border-gray-300 hover:border-indigo-400'
+                        ? 'border-accent bg-accent/10'
+                        : 'border-muted-foreground/30 hover:border-accent'
                     }`}
                     title={isCompleted ? 'Mark incomplete' : goal.status === 'in_progress' ? 'Mark complete' : 'Start task'}
                   >
-                    {isCompleted && (
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                    {goal.status === 'in_progress' && (
-                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    {isCompleted ? (
+                      <CheckCircle className="w-4 h-4" />
+                    ) : goal.status === 'in_progress' ? (
+                      <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
+                    ) : (
+                      <Circle className="w-4 h-4" />
                     )}
                   </button>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`font-medium text-sm text-gray-900 ${isCompleted ? 'line-through' : ''}`}>
+                      <span className={`font-medium text-sm text-foreground ${isCompleted ? 'line-through' : ''}`}>
                         {goal.title}
                       </span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${priority.bg} ${priority.color}`}>
@@ -238,31 +215,25 @@ export default function TaskDashboard() {
                     </div>
 
                     {goal.description && (
-                      <p className="text-gray-500 text-xs mt-1 line-clamp-1">{goal.description}</p>
+                      <p className="text-muted-foreground text-xs mt-1 line-clamp-1">{goal.description}</p>
                     )}
 
-                    <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+                    <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                       {goal.estimatedDuration && (
                         <span className="flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                          <Clock className="w-3 h-3" />
                           {goal.estimatedDuration}m
                         </span>
                       )}
                       {goal.energyRequired && (
                         <span className="flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
+                          <Zap className="w-3 h-3" />
                           {goal.energyRequired}/10
                         </span>
                       )}
                       {goal.deadline && (
                         <span className={`flex items-center gap-1 ${new Date(goal.deadline) < new Date() && !isCompleted ? 'text-red-500' : ''}`}>
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
+                          <Target className="w-3 h-3" />
                           {new Date(goal.deadline).toLocaleDateString()}
                         </span>
                       )}
@@ -273,18 +244,13 @@ export default function TaskDashboard() {
                   <button
                     onClick={() => handleDelete(goal.id)}
                     disabled={deletingId === goal.id}
-                    className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-all"
                     title="Delete goal"
                   >
                     {deletingId === goal.id ? (
-                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
+                      <div className="animate-spin w-4 h-4 border-2 border-muted-foreground border-t-transparent rounded-full" />
                     ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <Trash2 className="w-4 h-4" />
                     )}
                   </button>
                 </div>
