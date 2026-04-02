@@ -5,6 +5,8 @@ import AppShell from '@/components/AppShell';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimeBlocks, TimeBlock } from '@/hooks/useTimeBlocks';
 import { useGoals } from '@/hooks/useGoals';
+import { useAccomplishmentLogs } from '@/hooks/useAccomplishmentLogs';
+import { detectBurnoutRisk } from '@/utils/productivityPrediction';
 import { AdaptiveScheduler } from '@/utils/adaptiveScheduler';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -35,6 +37,7 @@ export default function PlannerPage() {
   const { user } = useAuth();
   const { timeBlocks, loading, createTimeBlock, deleteTimeBlock } = useTimeBlocks(user?.uid);
   const { goals, loading: goalsLoading } = useGoals(user?.uid);
+  const { logs } = useAccomplishmentLogs(user?.uid);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -43,6 +46,25 @@ export default function PlannerPage() {
   const [scheduleInfo, setScheduleInfo] = useState<string>('');
   const [scheduledCount, setScheduledCount] = useState(0);
   const [unscheduledCount, setUnscheduledCount] = useState(0);
+
+  // Calculate overload detection
+  const scheduledTasks = goals
+    .filter(g => g.scheduledStart)
+    .map(g => ({
+      date: g.scheduledStart!.toISOString().split('T')[0],
+      count: 1
+    }))
+    .reduce((acc, task) => {
+      const existing = acc.find(t => t.date === task.date);
+      if (existing) {
+        existing.count++;
+      } else {
+        acc.push(task);
+      }
+      return acc;
+    }, [] as Array<{ date: string; count: number }>);
+
+  const burnoutRisk = detectBurnoutRisk(logs, scheduledTasks);
 
   const toggleDay = (day: number) => {
     setForm((f) => ({
@@ -167,6 +189,57 @@ export default function PlannerPage() {
   return (
     <AppShell>
       <div className="p-6 max-w-7xl mx-auto space-y-6">
+        {/* Overload Warning */}
+        {burnoutRisk.riskLevel !== 'low' && (
+          <div className={`p-4 rounded-lg border ${
+            burnoutRisk.riskLevel === 'critical' ? 'bg-red-50 border-red-200' :
+            burnoutRisk.riskLevel === 'high' ? 'bg-orange-50 border-orange-200' :
+            'bg-yellow-50 border-yellow-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className={`p-1 rounded ${
+                burnoutRisk.riskLevel === 'critical' ? 'bg-red-100' :
+                burnoutRisk.riskLevel === 'high' ? 'bg-orange-100' :
+                'bg-yellow-100'
+              }`}>
+                <svg className="w-5 h-5 text-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className={`font-medium ${
+                  burnoutRisk.riskLevel === 'critical' ? 'text-red-800' :
+                  burnoutRisk.riskLevel === 'high' ? 'text-orange-800' :
+                  'text-yellow-800'
+                }`}>
+                  {burnoutRisk.riskLevel === 'critical' ? 'Critical Overload Risk' :
+                   burnoutRisk.riskLevel === 'high' ? 'High Overload Risk' :
+                   'Medium Overload Risk'}
+                </h3>
+                <ul className="mt-2 text-sm text-gray-700 space-y-1">
+                  {burnoutRisk.factors.map((factor, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <span className="text-gray-400 mt-1">•</span>
+                      {factor}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3">
+                  <h4 className="text-sm font-medium text-gray-800">Recommendations:</h4>
+                  <ul className="mt-1 text-sm text-gray-700 space-y-1">
+                    {burnoutRisk.recommendations.map((rec, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-green-500 mt-1">✓</span>
+                        {rec}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
