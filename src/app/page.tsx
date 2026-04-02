@@ -9,6 +9,7 @@ import LifeDashboard from '@/components/LifeDashboard';
 import EnergyTracker from '@/components/EnergyTracker';
 import HabitStreaks from '@/components/HabitStreaks';
 import ProductivityChallenges from '@/components/ProductivityChallenges';
+import LandingPage from '@/components/LandingPage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 
@@ -80,6 +81,11 @@ export default function Home() {
       }
     }
   };
+
+  // If user is not authenticated, show landing page
+  if (!user) {
+    return <LandingPage />;
+  }
 
   return (
     <AppShell>
