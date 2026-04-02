@@ -1,6 +1,7 @@
 'use client';
 
 import AppShell from '@/components/AppShell';
+import DeepWorkAnalytics from '@/components/DeepWorkAnalytics';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useAccomplishmentLogs } from '@/hooks/useAccomplishmentLogs';
@@ -123,6 +124,9 @@ export default function InsightsPage() {
             </div>
           </div>
         </div>
+
+        {/* Deep Work Analytics */}
+        <DeepWorkAnalytics />
 
         {/* Recent logs */}
         {logs.length > 0 && (

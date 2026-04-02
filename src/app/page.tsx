@@ -6,6 +6,9 @@ import GoalInput from '@/components/GoalInput';
 import TaskDashboard from '@/components/TaskDashboard';
 import AISuggestions from '@/components/AISuggestions';
 import LifeDashboard from '@/components/LifeDashboard';
+import EnergyTracker from '@/components/EnergyTracker';
+import HabitStreaks from '@/components/HabitStreaks';
+import ProductivityChallenges from '@/components/ProductivityChallenges';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 
@@ -113,21 +116,26 @@ export default function Home() {
         )}
 
         {/* Main grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-7 gap-6">
           {/* Left: Goal input + AI suggestions */}
           <div className="xl:col-span-1 space-y-6">
             <GoalInput />
             <AISuggestions />
           </div>
 
-          {/* Center: Task dashboard */}
-          <div className="xl:col-span-2">
+          {/* Center: Task dashboard + Habit streaks + Challenges */}
+          <div className="xl:col-span-4 space-y-6">
             <TaskDashboard />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <HabitStreaks />
+              <ProductivityChallenges />
+            </div>
           </div>
 
-          {/* Right: Life dashboard */}
-          <div className="xl:col-span-1">
+          {/* Right: Life dashboard + Energy tracker */}
+          <div className="xl:col-span-2 space-y-6">
             <LifeDashboard />
+            <EnergyTracker />
           </div>
         </div>
       </div>
