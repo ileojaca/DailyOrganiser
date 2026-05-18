@@ -106,6 +106,44 @@ export async function GET(request: NextRequest) {
         break;
       }
 
+      case 'ai-summary': {
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+          insights = { summary: 'AI insights require ANTHROPIC_API_KEY to be configured.' };
+          break;
+        }
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const client = new Anthropic({ apiKey });
+
+        const completedCount = logs.filter((l: any) => l.completion_status === 'completed').length;
+        const totalCount = logs.length;
+        const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+        const msg = await client.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 400,
+          messages: [{
+            role: 'user',
+            content: `You are a productivity coach. Based on this user's data, provide 3 specific, actionable insights in JSON format.
+
+User stats (last ${days} days):
+- Tasks completed: ${completedCount} of ${totalCount} (${completionRate}%)
+- Categories: ${[...new Set(logs.map((l: any) => l.category))].join(', ') || 'none'}
+
+Return JSON: { "insights": [{ "title": "string", "insight": "string", "action": "string" }] }`
+          }],
+        });
+
+        try {
+          const text = msg.content[0].type === 'text' ? msg.content[0].text : '{}';
+          insights = JSON.parse(text);
+        } catch {
+          insights = { insights: [] };
+        }
+        break;
+      }
+
       default:
         return NextResponse.json({ error: 'Invalid insight type' }, { status: 400 });
     }

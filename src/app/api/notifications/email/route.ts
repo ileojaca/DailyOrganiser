@@ -11,13 +11,22 @@ interface EmailNotification {
 
 export async function POST(request: NextRequest) {
   try {
-    const uid = await verifyAuthToken(request);
-    if (!uid) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const isInternalCall = request.headers.get('x-internal-call') === 'true';
+    let uid: string | null = null;
+    let parsedBody: EmailNotification & { userId?: string };
+
+    if (isInternalCall) {
+      parsedBody = await request.json();
+      uid = parsedBody.userId || null;
+    } else {
+      uid = await verifyAuthToken(request);
+      if (!uid) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      parsedBody = await request.json();
     }
 
-    const body = await request.json();
-    const { to, subject, body: emailBody, type } = body as EmailNotification;
+    const { to, subject, body: emailBody, type } = parsedBody as EmailNotification;
 
     if (!to || !subject || !emailBody || !type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -25,10 +34,12 @@ export async function POST(request: NextRequest) {
 
     // Check if user has email notifications enabled
     const adminDb = getAdminDb();
-    const profileDoc = await adminDb.collection('users').doc(uid).get();
-    const preferences = profileDoc.data()?.preferences;
-    if (preferences?.emailNotifications === false) {
-      return NextResponse.json({ message: 'Email notifications disabled' }, { status: 200 });
+    if (uid) {
+      const profileDoc = await adminDb.collection('users').doc(uid).get();
+      const preferences = profileDoc.data()?.preferences;
+      if (preferences?.emailNotifications === false) {
+        return NextResponse.json({ message: 'Email notifications disabled' }, { status: 200 });
+      }
     }
 
     // Send email via Resend if API key is configured
@@ -48,20 +59,24 @@ export async function POST(request: NextRequest) {
       console.log(`[EMAIL] Type: ${type}`);
     }
 
-    // Log email to Firestore
-    const emailLogRef = await adminDb.collection('users').doc(uid).collection('emailLogs').add({
-      recipient: to,
-      subject,
-      body: emailBody,
-      type,
-      status: resendApiKey ? 'sent' : 'logged',
-      sentAt: new Date(),
-    });
+    // Log email to Firestore if we have a uid
+    let emailId: string | undefined;
+    if (uid) {
+      const emailLogRef = await adminDb.collection('users').doc(uid).collection('emailLogs').add({
+        recipient: to,
+        subject,
+        body: emailBody,
+        type,
+        status: resendApiKey ? 'sent' : 'logged',
+        sentAt: new Date(),
+      });
+      emailId = emailLogRef.id;
+    }
 
     return NextResponse.json({
       success: true,
       message: 'Email notification sent',
-      emailId: emailLogRef.id,
+      emailId,
     });
   } catch (error) {
     console.error('Error sending email notification:', error);

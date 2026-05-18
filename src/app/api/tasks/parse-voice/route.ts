@@ -1,6 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseTaskInput, generateConfirmation } from '@/utils/voiceTaskParser';
 import { createTask } from '@/lib/firebaseUtils';
+import Anthropic from '@anthropic-ai/sdk';
+
+async function parseWithClaude(input: string, userId: string) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return null;
+
+  const client = new Anthropic({ apiKey });
+  const msg = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 300,
+    messages: [{
+      role: 'user',
+      content: `Parse this task description into structured data. Return ONLY valid JSON, no explanation.
+
+Input: "${input}"
+
+Return JSON with these fields:
+{
+  "taskTitle": "string (required)",
+  "category": "homework|work|chores|exercise|social|personal|family|rest",
+  "priority": 1-5 (5=urgent),
+  "duration": minutes as number,
+  "energyRequired": 1-10,
+  "scheduledTime": "ISO datetime string or null",
+  "confidence": 0.0-1.0
+}`
+    }],
+  });
+
+  try {
+    const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/tasks/parse-voice
@@ -28,8 +64,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Input text is required' }, { status: 400 });
     }
 
-    // Parse the input
-    const parsed = parseTaskInput(normalizedInput);
+    // Parse the input — try Claude first, fall back to regex
+    let parsed = await parseWithClaude(normalizedInput, userId);
+    if (!parsed) {
+      parsed = parseTaskInput(normalizedInput);
+    }
 
     if (!parsed.taskTitle) {
       return NextResponse.json(
