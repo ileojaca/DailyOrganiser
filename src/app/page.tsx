@@ -9,6 +9,7 @@ import HabitStreaks from '@/components/HabitStreaks';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import LandingPage from '@/components/LandingPage';
 import TodayTimeline from '@/components/TodayTimeline';
+import OptimizedDaySchedule from '@/components/OptimizedDaySchedule';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -317,6 +318,11 @@ export default function Home() {
             </div>
           </form>
 
+          {/* Optimized Schedule */}
+          <div className="px-4 mb-4">
+            <OptimizedDaySchedule tasks={activeTasks} currentEnergy={5} sleepHours={7} />
+          </div>
+
           {/* Task section */}
           <div className="flex items-center justify-between px-4 mb-2 mt-2">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Today&apos;s Tasks</h2>
@@ -412,6 +418,7 @@ export default function Home() {
             <div className="space-y-1">
               {[
                 { href: '/sleep', emoji: '🌙', label: 'Sleep Tracker' },
+                { href: '/energy', emoji: '⚡', label: 'Energy Tracker' },
                 { href: '/family', emoji: '👨‍👩‍👧', label: 'Family Hub' },
                 { href: '/planner', emoji: '📅', label: 'Planner' },
                 { href: '/insights', emoji: '📊', label: 'Insights' },
