@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import NotificationCenter from './NotificationCenter';
+import PushPermissionBanner from './PushPermissionBanner';
 
 const NAV_ITEMS = [
   { href: '/', label: 'Dashboard', desc: 'Your daily overview', icon: (
@@ -226,6 +227,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <main className="flex-1 lg:ml-64 pt-14 lg:pt-0 min-h-screen safe-area-bottom">
+        <PushPermissionBanner />
         {children}
       </main>
     </div>

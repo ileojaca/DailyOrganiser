@@ -85,39 +85,24 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Push notification event
-self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? {};
+self.addEventListener('push', function(event) {
+  const data = event.data ? event.data.json() : {};
   const title = data.title || 'DailyOrganiser';
   const options = {
-    body: data.body || 'You have a new notification',
-    icon: '/icon-192x192.png',
-    badge: '/icon-192x192.png',
+    body: data.body || '',
+    icon: data.icon || '/icon-192.png',
+    badge: '/icon-192.png',
+    data: data.data || {},
     vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: data.primaryKey || 1
-    },
-    actions: [
-      { action: 'explore', title: 'View' },
-      { action: 'close', title: 'Close' }
-    ]
+    actions: data.actions || []
   };
-
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Notification click event
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-
-  if (event.action === 'explore') {
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  }
+  const url = event.notification.data?.url || '/';
+  event.waitUntil(clients.openWindow(url));
 });
 
 // Background sync for offline task creation
