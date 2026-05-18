@@ -15,13 +15,30 @@ export async function GET(request: NextRequest) {
 
     // Fetch user's goals as accomplishment logs
     const goalsSnapshot = await getAdminDb().collection('users').doc(uid).collection('goals').orderBy('createdAt', 'desc').limit(100).get();
-    const logs = goalsSnapshot.docs.map(d => ({
-      ...d.data(),
-      id: d.id,
-      completion_status: d.data().status === 'completed' ? 'completed' : 'pending',
-      efficiency_score: d.data().status === 'completed' ? 8 : 0,
-      scheduled_date: d.data().scheduledDate || d.data().createdAt?.toDate?.()?.toISOString?.()?.split('T')[0],
-    }));
+    const logs = goalsSnapshot.docs.map(d => {
+      const data = d.data();
+      const scheduledDate = data.scheduledDate || data.createdAt?.toDate?.()?.toISOString?.()?.split('T')[0] || new Date().toISOString().split('T')[0];
+      const isCompleted = data.status === 'completed';
+      return {
+        id: d.id,
+        userId: uid,
+        goalId: d.id,
+        scheduledDate,
+        scheduledHour: data.scheduledHour ?? 9,
+        actualDuration: data.actualDuration,
+        completionStatus: (isCompleted ? 'completed' : 'abandoned') as 'completed' | 'partial' | 'abandoned',
+        energyLevelAtStart: data.energyRequired,
+        contextSnapshot: {},
+        efficiencyScore: isCompleted ? 0.8 : 0,
+        createdAt: data.createdAt?.toDate?.() || new Date(),
+        // extra fields for local filtering
+        completion_status: isCompleted ? 'completed' : 'pending',
+        efficiency_score: isCompleted ? 8 : 0,
+        scheduled_date: scheduledDate,
+        category: data.category,
+        status: data.status,
+      };
+    });
 
     // Fetch scheduled tasks (upcoming)
     const today = new Date().toISOString().split('T')[0];
@@ -114,13 +131,27 @@ export async function POST(request: NextRequest) {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const recentSnapshot = await getAdminDb().collection('users').doc(uid).collection('goals').orderBy('createdAt', 'desc').limit(100).get();
     const recentLogs = recentSnapshot.docs
-      .map(d => ({
-        ...d.data(),
-        id: d.id,
-        completion_status: d.data().status === 'completed' ? 'completed' : 'pending',
-        efficiency_score: d.data().status === 'completed' ? 8 : 0,
-        scheduled_date: d.data().scheduledDate || d.data().createdAt?.toDate?.()?.toISOString?.()?.split('T')[0],
-      }))
+      .map(d => {
+        const data = d.data();
+        const scheduledDate = data.scheduledDate || data.createdAt?.toDate?.()?.toISOString?.()?.split('T')[0] || new Date().toISOString().split('T')[0];
+        const isCompleted = data.status === 'completed';
+        return {
+          id: d.id,
+          userId: uid,
+          goalId: d.id,
+          scheduledDate,
+          scheduledHour: data.scheduledHour ?? 9,
+          actualDuration: data.actualDuration,
+          completionStatus: (isCompleted ? 'completed' : 'abandoned') as 'completed' | 'partial' | 'abandoned',
+          energyLevelAtStart: data.energyRequired,
+          contextSnapshot: {},
+          efficiencyScore: isCompleted ? 0.8 : 0,
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          completion_status: isCompleted ? 'completed' : 'pending',
+          efficiency_score: isCompleted ? 8 : 0,
+          scheduled_date: scheduledDate,
+        };
+      })
       .filter((l: { scheduled_date?: string }) => l.scheduled_date && l.scheduled_date >= sevenDaysAgo);
 
     const recentCompletionRate = recentLogs.length > 0

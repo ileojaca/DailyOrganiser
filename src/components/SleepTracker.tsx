@@ -139,7 +139,7 @@ export default function SleepTracker() {
       quality: newSleep.quality,
       awakenings: newSleep.awakenings,
       notes: newSleep.notes || undefined,
-      source: 'manual',
+      source: 'manual' as const,
       createdAt: new Date(),
     };
 
