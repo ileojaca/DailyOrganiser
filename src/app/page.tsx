@@ -6,10 +6,6 @@ import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import LandingPage from '@/components/LandingPage';
-import OptimizedDaySchedule from '@/components/OptimizedDaySchedule';
-import TodayTimeline from '@/components/TodayTimeline';
-import HabitStreaks from '@/components/HabitStreaks';
-import EnergyTracker from '@/components/EnergyTracker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -119,16 +115,14 @@ export default function Home() {
   const { goals, createGoal, updateGoal, completeGoal } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
   const { progress: gamificationProgress } = useGamification();
-  const { energy, sleep } = useSleepAndEnergy(user?.uid);
+  const { energy } = useSleepAndEnergy(user?.uid);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [alertsFired, setAlertsFired] = useState(false);
   const [quickTask, setQuickTask] = useState('');
   const [addingTask, setAddingTask] = useState(false);
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const name = profile?.fullName?.split(' ')[0] || 'there';
-  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -159,12 +153,6 @@ export default function Home() {
   });
 
   const topPriorityTask = [...activeTasks].sort((a, b) => b.priority - a.priority)[0] ?? null;
-
-  const scheduledToday = activeTasks.filter(g => {
-    if (!g.scheduledStart) return false;
-    const s = new Date(g.scheduledStart);
-    return s >= today && s < tomorrow;
-  });
 
   const displayTasks = [...activeTasks]
     .sort((a, b) => b.priority - a.priority)
@@ -256,7 +244,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto py-12 px-4">
           <div className="mb-8 text-center">
             <div className="text-6xl mb-4 animate-bounce" style={{ animationDuration: '2s' }}>👋</div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">Welcome to DailyOrganiser</h1>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">Welcome, {name}!</h1>
             <p className="text-gray-600 dark:text-gray-400 text-lg">Get organized, stay focused, and crush your goals.</p>
           </div>
 
@@ -272,8 +260,8 @@ export default function Home() {
               <p className="text-xs text-gray-500 dark:text-gray-400">Deep work with the Pomodoro timer</p>
             </div>
             <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
-              <p className="text-3xl mb-2">🧠</p>
-              <p className="font-semibold text-gray-900 dark:text-white mb-1">AI Insights</p>
+              <p className="text-3xl mb-2">🤖</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">AI Assistant</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Get smart recommendations and briefings</p>
             </div>
             <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
@@ -306,28 +294,31 @@ export default function Home() {
     <AppShell>
       <div className="max-w-6xl mx-auto xl:grid xl:grid-cols-3 xl:gap-6 xl:px-6 xl:py-6 min-h-screen">
 
-        {/* Main column */}
         <div className="xl:col-span-2">
 
-          {/* Greeting */}
-          <div className="px-4 pt-6 pb-4">
-            <p className="text-sm font-medium text-gray-500">{todayLabel}</p>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{greeting}, {name} 👋</h1>
-            {completedToday.length > 0 && (
-              <p className="text-sm text-green-600 mt-1">✓ {completedToday.length} task{completedToday.length > 1 ? 's' : ''} done today</p>
-            )}
+          <div className={`mx-4 mt-4 mb-3 p-4 rounded-2xl ${
+            smartMsg.urgency === 'critical' ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' :
+            smartMsg.urgency === 'warning' ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' :
+            'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm'
+          }`}>
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">{smartMsg.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <p className={`font-semibold text-sm ${
+                  smartMsg.urgency === 'critical' ? 'text-red-700 dark:text-red-400' :
+                  smartMsg.urgency === 'warning' ? 'text-amber-700 dark:text-amber-400' :
+                  'text-gray-900 dark:text-white'
+                }`}>{smartMsg.headline}</p>
+                <p className={`text-xs mt-0.5 ${
+                  smartMsg.urgency === 'critical' ? 'text-red-600 dark:text-red-300' :
+                  smartMsg.urgency === 'warning' ? 'text-amber-600 dark:text-amber-300' :
+                  'text-gray-500 dark:text-gray-400'
+                }`}>{smartMsg.detail}</p>
+              </div>
+              <Link href="/assistant" className="flex-shrink-0 text-xs font-medium" style={{ color: 'var(--accent-color)' }}>Ask AI →</Link>
+            </div>
           </div>
 
-          {/* Alert banner */}
-          {overdueTasks.length > 0 && (
-            <div className="mx-4 mb-4 flex items-center gap-2.5 p-3 bg-red-50 border border-red-100 rounded-xl">
-              <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
-              <p className="text-sm font-medium text-red-700">{overdueTasks.length} task{overdueTasks.length > 1 ? 's' : ''} overdue</p>
-              <Link href="/tasks" className="ml-auto text-xs text-red-600 font-medium">View →</Link>
-            </div>
-          )}
-
-          {/* Today's Focus card */}
           {topPriorityTask && (
             <div
               className="mx-4 mb-4 rounded-2xl p-5 text-white"
@@ -350,7 +341,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Stats pills */}
           <div className="flex gap-2 px-4 mb-5 overflow-x-auto pb-1">
             <div className="flex-shrink-0 flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-full px-3 py-1.5 shadow-sm">
               <span className="text-sm font-bold text-gray-900 dark:text-white">{activeTasks.length}</span>
@@ -375,7 +365,6 @@ export default function Home() {
             )}
           </div>
 
-          {/* Quick add */}
           <form onSubmit={e => { e.preventDefault(); handleQuickAdd(); }} className="mx-4 mb-5">
             <div className="flex gap-2">
               <input
@@ -397,17 +386,11 @@ export default function Home() {
             </div>
           </form>
 
-          {/* Optimized Schedule */}
-          <div className="px-4 mb-4">
-            <OptimizedDaySchedule tasks={activeTasks} currentEnergy={energy.currentLevel} sleepHours={sleep.lastNightHours} />
-          </div>
-
-          {/* Task section */}
-          <div className="flex items-center justify-between px-4 mb-2 mt-2">
+          <div className="flex items-center justify-between px-4 mb-2">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Today&apos;s Tasks</h2>
             <Link href="/tasks" className="text-xs font-medium" style={{ color: 'var(--accent-color)' }}>See all →</Link>
           </div>
-          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl mx-4 mb-4 overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl mx-4 mb-6 overflow-hidden shadow-sm">
             {displayTasks.length === 0 ? (
               <div className="py-8 text-center text-gray-400 text-sm">No active tasks — great job! 🎉</div>
             ) : (
@@ -432,8 +415,8 @@ export default function Home() {
                       <span className="text-xs text-gray-400">{CATEGORY_EMOJI[task.category] || '📌'} {task.category}</span>
                       {task.estimatedDuration && <span className="text-xs text-gray-400">· {task.estimatedDuration}m</span>}
                       {task.deadline && (
-                        <span className={`text-xs font-medium ${task.deadline < new Date() ? 'text-red-500' : 'text-gray-400'}`}>
-                          · {formatDeadline(task.deadline)}
+                        <span className={`text-xs font-medium ${new Date(task.deadline) < new Date() ? 'text-red-500' : 'text-gray-400'}`}>
+                          · {formatDeadline(new Date(task.deadline))}
                         </span>
                       )}
                     </div>
@@ -445,24 +428,8 @@ export default function Home() {
               ))
             )}
           </div>
-
-          {/* Timeline */}
-          {scheduledToday.length > 0 && (
-            <div className="px-4 mb-4">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Today&apos;s Schedule</h2>
-              <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm">
-                <TodayTimeline tasks={scheduledToday} />
-              </div>
-            </div>
-          )}
-
-          {/* Habits */}
-          <div className="px-4 mb-6">
-            <HabitStreaks />
-          </div>
         </div>
 
-        {/* Desktop right sidebar */}
         <div className="hidden xl:block space-y-4">
           {gamificationProgress && (
             <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
@@ -488,19 +455,14 @@ export default function Home() {
             </div>
           )}
 
-          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm overflow-hidden">
-            <EnergyTracker />
-          </div>
-
           <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Quick Links</h3>
             <div className="space-y-1">
               {[
-                { href: '/sleep', emoji: '🌙', label: 'Sleep Tracker' },
-                { href: '/energy', emoji: '⚡', label: 'Energy Tracker' },
-                { href: '/family', emoji: '👨‍👩‍👧', label: 'Family Hub' },
+                { href: '/tasks', emoji: '📝', label: 'Tasks' },
+                { href: '/focus', emoji: '⏱️', label: 'Focus' },
+                { href: '/assistant', emoji: '🤖', label: 'AI Assistant' },
                 { href: '/planner', emoji: '📅', label: 'Planner' },
-                { href: '/insights', emoji: '📊', label: 'Insights' },
               ].map(l => (
                 <Link
                   key={l.href}
