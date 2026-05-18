@@ -2,395 +2,208 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import type { OnboardingStep, OnboardingProgress } from '@/types/lifeManagement';
+import { useGoals } from '@/hooks/useGoals';
 import { getDb } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
 }
 
+type StepType = 'welcome' | 'features' | 'first_task' | 'complete';
+
 export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   const { user } = useAuth();
-  const [progress, setProgress] = useState<OnboardingProgress | null>(null);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-
-  const steps: OnboardingStep[] = [
-    {
-      id: 'welcome',
-      title: 'Welcome to DailyOrganiser!',
-      description: 'Let\'s set up your personalized life management system in just a few steps.',
-      component: 'welcome',
-      completed: false,
-      optional: false,
-      order: 1,
-    },
-    {
-      id: 'chronotype',
-      title: 'What\'s your chronotype?',
-      description: 'Understanding your natural rhythm helps us schedule tasks at optimal times.',
-      component: 'chronotype',
-      completed: false,
-      optional: false,
-      order: 2,
-    },
-    {
-      id: 'priorities',
-      title: 'What are your main priorities?',
-      description: 'Select the areas of life you want to focus on improving.',
-      component: 'priorities',
-      completed: false,
-      optional: false,
-      order: 3,
-    },
-    {
-      id: 'family',
-      title: 'Family goals',
-      description: 'Tell us how your family time should fit into your schedule.',
-      component: 'family',
-      completed: false,
-      optional: true,
-      order: 4,
-    },
-    {
-      id: 'worklife',
-      title: 'Work-life balance',
-      description: 'Set your target work vs rest ratio to keep you healthy.',
-      component: 'worklife',
-      completed: false,
-      optional: true,
-      order: 5,
-    },
-    {
-      id: 'goals',
-      title: 'Set your first goal',
-      description: 'Start with one achievable goal to build momentum.',
-      component: 'goals',
-      completed: false,
-      optional: true,
-      order: 6,
-    },
-    {
-      id: 'complete',
-      title: 'You\'re all set!',
-      description: 'Your personalized life management system is ready to use.',
-      component: 'complete',
-      completed: false,
-      optional: false,
-      order: 5,
-    },
-  ];
+  const { createGoal } = useGoals(user?.uid);
+  const [currentStep, setCurrentStep] = useState<StepType>('welcome');
+  const [prevStep, setPrevStep] = useState<StepType>('welcome');
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskCategory, setTaskCategory] = useState<'work' | 'personal' | 'health' | 'learning' | 'social' | 'family'>('personal');
+  const [taskPriority, setTaskPriority] = useState(3);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-
-    const loadOnboarding = async () => {
-      // Check localStorage first for instant UX
-      const saved = localStorage.getItem(`onboarding_${user.uid}`);
-      if (saved) {
-        const savedProgress = JSON.parse(saved);
-        if (savedProgress.completedAt) {
-          onComplete();
-          return;
-        }
-        setProgress(savedProgress);
-        setCurrentStep(savedProgress.currentStep);
-      } else {
-        const newProgress: OnboardingProgress = {
-          userId: user.uid,
-          currentStep: 0,
-          completedSteps: [],
-          startedAt: new Date(),
-        };
-        setProgress(newProgress);
-        localStorage.setItem(`onboarding_${user.uid}`, JSON.stringify(newProgress));
-      }
-
-      // Also check Firestore for authoritative completion status
-      try {
-        const db = getDb();
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data()?.onboardingCompleted === true) {
-          onComplete();
-        }
-      } catch (err) {
-        console.error('Error checking Firestore onboarding status:', err);
-      }
-    };
-
-    loadOnboarding();
-  }, [user, onComplete]);
-
-  const nextStep = async () => {
-    if (!progress || !user) return;
-
-    const updatedProgress: OnboardingProgress = {
-      ...progress,
-      currentStep: currentStep + 1,
-      completedSteps: [...progress.completedSteps, steps[currentStep].id],
-    };
-
-    if (currentStep + 1 >= steps.length) {
-      updatedProgress.completedAt = new Date();
-      localStorage.setItem(`onboarding_${user.uid}`, JSON.stringify(updatedProgress));
-
-      // Write completion to Firestore
-      try {
-        const db = getDb();
-        await setDoc(
-          doc(db, 'users', user.uid),
-          {
-            onboardingCompleted: true,
-            chronotype: answers.chronotype,
-            priorities: answers.priorities,
-            familyPlan: answers.familyPlan,
-            worklifeBalance: answers.worklifeBalance,
-            onboardingCompletedAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
-      } catch (err) {
-        console.error('Error writing onboarding completion to Firestore:', err);
-      }
-
+    const neverShow = localStorage.getItem('dailyOrganiserNeverShowOnboarding') === 'true';
+    if (neverShow) {
       onComplete();
-    } else {
-      setProgress(updatedProgress);
-      setCurrentStep(currentStep + 1);
-      localStorage.setItem(`onboarding_${user.uid}`, JSON.stringify(updatedProgress));
+    }
+  }, [onComplete]);
 
-      // Save progress to Firestore
+  const handleNext = async () => {
+    setPrevStep(currentStep);
+    if (currentStep === 'welcome') {
+      setCurrentStep('features');
+    } else if (currentStep === 'features') {
+      setCurrentStep('first_task');
+    } else if (currentStep === 'first_task') {
+      if (!taskTitle.trim()) return;
+      setIsSubmitting(true);
       try {
-        const db = getDb();
-        await setDoc(
-          doc(db, 'users', user.uid),
-          { answers, currentStep: currentStep + 1 },
-          { merge: true }
-        );
-      } catch (err) {
-        console.error('Error saving onboarding progress to Firestore:', err);
+        await createGoal({
+          title: taskTitle.trim(),
+          category: taskCategory,
+          priority: taskPriority,
+          estimatedDuration: 30,
+          energyRequired: 5
+        });
+        setCurrentStep('complete');
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
 
-  const skipStep = () => {
-    if (!steps[currentStep].optional) return;
-    nextStep();
+  const handleSkip = () => {
+    setPrevStep(currentStep);
+    setCurrentStep('complete');
+  };
+
+  const handleComplete = async () => {
+    if (!user) return;
+    localStorage.setItem('dailyOrganiserNeverShowOnboarding', 'true');
+
+    try {
+      const db = getDb();
+      await setDoc(
+        doc(db, 'users', user.uid),
+        {
+          onboardingCompleted: true,
+          onboardingCompletedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.error('Error saving onboarding completion:', err);
+    }
+
+    onComplete();
   };
 
   const renderStepContent = () => {
-    const step = steps[currentStep];
-
-    switch (step.component) {
+    switch (currentStep) {
       case 'welcome':
         return (
           <div className="text-center">
-            <div className="text-6xl mb-4">🎯</div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {step.title}
+            <div className="inline-block mb-6 p-4 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent-color) 10%, transparent)' }}>
+              <div className="text-6xl">🎯</div>
+            </div>
+            <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Welcome to DailyOrganiser!
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {step.description}
+            <p className="text-lg text-gray-600 dark:text-gray-400">
+              Your personal AI assistant to stay organized and on track.
             </p>
-            <div className="space-y-4 text-left max-w-md mx-auto">
-              <div className="flex items-start gap-3">
-                <span className="text-green-500">✓</span>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Track your daily tasks and goals
-                </p>
+          </div>
+        );
+
+      case 'features':
+        return (
+          <div className="text-center">
+            <div className="inline-block mb-6 p-4 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent-color) 10%, transparent)' }}>
+              <div className="text-6xl">✨</div>
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">
+              Here's how we help
+            </h2>
+            <div className="space-y-4 max-w-sm mx-auto">
+              <div className="flex items-start gap-4 text-left p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <span className="text-3xl flex-shrink-0">📝</span>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">Capture</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Add your tasks and goals</p>
+                </div>
               </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-500">✓</span>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Balance work, family, and personal time
-                </p>
+              <div className="flex items-start gap-4 text-left p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <span className="text-3xl flex-shrink-0">⏱️</span>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">Focus</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Deep work with the Pomodoro timer</p>
+                </div>
               </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-500">✓</span>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Get AI-powered insights and recommendations
-                </p>
+              <div className="flex items-start gap-4 text-left p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <span className="text-3xl flex-shrink-0">🧠</span>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">AI Insights</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Get smart recommendations and briefings</p>
+                </div>
               </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-500">✓</span>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Build healthy habits and maintain balance
-                </p>
+              <div className="flex items-start gap-4 text-left p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <span className="text-3xl flex-shrink-0">💤</span>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">Track Health</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Monitor sleep, energy, and habits</p>
+                </div>
               </div>
             </div>
           </div>
         );
 
-      case 'chronotype':
+      case 'first_task':
         return (
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {step.title}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {step.description}
-            </p>
-            <div className="space-y-3">
-              {[
-                { value: 'lark', label: '🌅 Early Bird (Lark)', desc: 'I\'m most productive in the morning' },
-                { value: 'owl', label: '🦉 Night Owl', desc: 'I do my best work in the evening' },
-                { value: 'intermediate', label: '🐦 Intermediate', desc: 'I\'m flexible throughout the day' },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setAnswers({ ...answers, chronotype: option.value })}
-                  className={`w-full p-4 rounded-lg border text-left transition-colors ${
-                    answers.chronotype === option.value
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300'
-                  }`}
-                >
-                  <p className="font-medium text-gray-900 dark:text-white">{option.label}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{option.desc}</p>
-                </button>
-              ))}
+            <div className="text-center mb-8">
+              <div className="inline-block mb-6 p-4 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent-color) 10%, transparent)' }}>
+                <div className="text-6xl">🚀</div>
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                Let's create your first task
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400">
+                Get started with your first goal
+              </p>
             </div>
-          </div>
-        );
-
-      case 'priorities':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {step.title}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {step.description}
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { value: 'work', label: '💼 Work', desc: 'Career & productivity' },
-                { value: 'health', label: '🏃 Health', desc: 'Fitness & wellness' },
-                { value: 'family', label: '👨‍👩‍👧‍👦 Family', desc: 'Relationships' },
-                { value: 'personal', label: '🌟 Personal', desc: 'Growth & hobbies' },
-                { value: 'learning', label: '📚 Learning', desc: 'Skills & education' },
-                { value: 'rest', label: '😴 Rest', desc: 'Sleep & recovery' },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => {
-                    const current = answers.priorities ? answers.priorities.split(',') : [];
-                    const updated = current.includes(option.value)
-                      ? current.filter(p => p !== option.value)
-                      : [...current, option.value];
-                    setAnswers({ ...answers, priorities: updated.join(',') });
-                  }}
-                  className={`p-4 rounded-lg border text-left transition-colors ${
-                    answers.priorities?.includes(option.value)
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300'
-                  }`}
-                >
-                  <p className="font-medium text-gray-900 dark:text-white">{option.label}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{option.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 'family':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {step.title}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {step.description}
-            </p>
-            <div className="space-y-3">
-              {[
-                { value: 'daily', label: 'Daily family check-in', desc: 'Log family activities every day' },
-                { value: 'weekly', label: 'Weekly family review', desc: 'Plan family time weekly' },
-                { value: 'occasional', label: 'Occasional catch-ups', desc: 'Focus mainly on personal habits' },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setAnswers({ ...answers, familyPlan: option.value })}
-                  className={`w-full p-4 rounded-lg border text-left transition-colors ${
-                    answers.familyPlan === option.value
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300'
-                  }`}
-                >
-                  <p className="font-medium text-gray-900 dark:text-white">{option.label}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{option.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 'worklife':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {step.title}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {step.description}
-            </p>
-            <div className="space-y-3">
-              {[
-                { value: 'balanced', label: 'Balanced 50/50', desc: 'Equally split work and rest' },
-                { value: 'focus', label: 'Focus of the week', desc: 'Higher work focus this week' },
-                { value: 'recovery', label: 'Recovery first', desc: 'Prioritize rest and wellness' },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setAnswers({ ...answers, worklifeBalance: option.value })}
-                  className={`w-full p-4 rounded-lg border text-left transition-colors ${
-                    answers.worklifeBalance === option.value
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-indigo-300'
-                  }`}
-                >
-                  <p className="font-medium text-gray-900 dark:text-white">{option.label}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{option.desc}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 'goals':
-        return (
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {step.title}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {step.description}
-            </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  What do you want to achieve?
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  What's your first goal?
                 </label>
                 <input
                   type="text"
-                  value={answers.goalTitle || ''}
-                  onChange={(e) => setAnswers({ ...answers, goalTitle: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="e.g., Exercise 3 times a week"
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="e.g., Complete project proposal"
+                  className="w-full px-4 py-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent"
+                  style={{ '--tw-ring-color': 'color-mix(in srgb, var(--accent-color) 30%, transparent)' } as React.CSSProperties}
+                  disabled={isSubmitting}
+                  autoFocus
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Target date
-                </label>
-                <input
-                  type="date"
-                  value={answers.goalDate || ''}
-                  onChange={(e) => setAnswers({ ...answers, goalDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={taskCategory}
+                    onChange={(e) => setTaskCategory(e.target.value as typeof taskCategory)}
+                    className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                    disabled={isSubmitting}
+                  >
+                    <option value="work">Work</option>
+                    <option value="personal">Personal</option>
+                    <option value="health">Health</option>
+                    <option value="learning">Learning</option>
+                    <option value="social">Social</option>
+                    <option value="family">Family</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Priority
+                  </label>
+                  <select
+                    value={taskPriority}
+                    onChange={(e) => setTaskPriority(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                    disabled={isSubmitting}
+                  >
+                    <option value="1">Low</option>
+                    <option value="2">Normal</option>
+                    <option value="3">Medium</option>
+                    <option value="4">High</option>
+                    <option value="5">Critical</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -399,30 +212,15 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
       case 'complete':
         return (
           <div className="text-center">
-            <div className="text-6xl mb-4">🎉</div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {step.title}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {step.description}
-            </p>
-            <div className="space-y-4 text-left max-w-md mx-auto">
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  ✓ Your profile is set up
-                </p>
-              </div>
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  ✓ Your schedule is optimized
-                </p>
-              </div>
-              <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <p className="text-sm text-green-700 dark:text-green-300">
-                  ✓ AI insights are ready
-                </p>
-              </div>
+            <div className="inline-block mb-6 p-4 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent-color) 10%, transparent)' }}>
+              <div className="text-6xl">✓</div>
             </div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+              You're all set!
+            </h2>
+            <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
+              Your dashboard is ready. Let's stay on track.
+            </p>
           </div>
         );
 
@@ -431,60 +229,49 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     }
   };
 
-  if (!progress) return null;
+  const stepNumber = currentStep === 'welcome' ? 1 : currentStep === 'features' ? 2 : currentStep === 'first_task' ? 3 : 4;
+  const totalSteps = 4;
+  const progress = (stepNumber / totalSteps) * 100;
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 shadow-2xl rounded-2xl overflow-hidden w-full max-w-4xl">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-          <div className="p-8 lg:p-10">
-            {/* Progress Bar */}
-            <div className="mb-6">
-              <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-2">
-                <span>Step {currentStep + 1} of {steps.length}</span>
-                <span>{Math.round(((currentStep + 1) / steps.length) * 100)}%</span>
-              </div>
-              <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full">
-                <div
-                  className="h-full bg-indigo-500 rounded-full transition-all"
-                  style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
-                />
-              </div>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 shadow-2xl rounded-3xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="p-8 lg:p-10">
+          <div className="mb-8">
+            <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-3">
+              <span>Step {stepNumber} of {totalSteps}</span>
+              <span>{Math.round(progress)}%</span>
             </div>
-
-            <div className="space-y-6">
-              {renderStepContent()}
-            </div>
-
-            <div className="flex gap-3 mt-8">
-              {steps[currentStep].optional && (
-                <button
-                  onClick={skipStep}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
-                >
-                  Skip
-                </button>
-              )}
-              <button
-                onClick={nextStep}
-                className="flex-1 px-4 py-2 btn-accent rounded-lg"
-              >
-                {currentStep === steps.length - 1 ? 'Get Started' : 'Continue'}
-              </button>
+            <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${progress}%`, background: 'var(--accent-color)' }}
+              />
             </div>
           </div>
-          <div className="hidden lg:flex items-center justify-center bg-indigo-50 dark:bg-indigo-950 p-8">
-            <div className="text-center">
-              <h3 className="text-xl font-bold text-indigo-700 dark:text-indigo-200 mb-3">Fast setup, actionable results</h3>
-              <p className="text-sm text-indigo-600 dark:text-indigo-300">Answer a few questions and we’ll configure your dashboard for family/work balance and productivity at once.</p>
-              <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-xl border border-indigo-100 dark:border-indigo-900 shadow-sm">
-                <div className="text-left space-y-2">
-                  <p className="text-xs font-semibold uppercase text-indigo-600 dark:text-indigo-400">Next step</p>
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{steps[currentStep].title}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{steps[currentStep].description}</p>
-                </div>
-              </div>
-            </div>
+
+          <div className="min-h-[360px] flex flex-col justify-center">
+            {renderStepContent()}
+          </div>
+
+          <div className="flex gap-3 mt-10">
+            {currentStep === 'first_task' && (
+              <button
+                onClick={handleSkip}
+                disabled={isSubmitting}
+                className="flex-1 px-4 py-3 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-semibold rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-50"
+              >
+                Skip
+              </button>
+            )}
+            <button
+              onClick={currentStep === 'complete' ? handleComplete : handleNext}
+              disabled={(currentStep === 'first_task' && !taskTitle.trim()) || isSubmitting}
+              className="flex-1 px-4 py-3 text-white font-semibold rounded-lg transition-opacity disabled:opacity-50"
+              style={{ background: 'var(--accent-color)' }}
+            >
+              {currentStep === 'complete' ? "Let's Go!" : 'Next'}
+            </button>
           </div>
         </div>
       </div>

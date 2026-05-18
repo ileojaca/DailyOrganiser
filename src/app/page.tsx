@@ -170,6 +170,58 @@ export default function Home() {
 
   if (!user) return <LandingPage />;
 
+  if (goals.length === 0) {
+    return (
+      <AppShell>
+        <div className="max-w-2xl mx-auto py-12 px-4">
+          <div className="mb-8 text-center">
+            <div className="text-6xl mb-4 animate-bounce" style={{ animationDuration: '2s' }}>👋</div>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">Welcome to DailyOrganiser</h1>
+            <p className="text-gray-600 dark:text-gray-400 text-lg">Get organized, stay focused, and crush your goals.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
+              <p className="text-3xl mb-2">📝</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">Create Tasks</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Add goals and track progress</p>
+            </div>
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
+              <p className="text-3xl mb-2">⏱️</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">Focus Sessions</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Deep work with the Pomodoro timer</p>
+            </div>
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
+              <p className="text-3xl mb-2">🧠</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">AI Insights</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Get smart recommendations and briefings</p>
+            </div>
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
+              <p className="text-3xl mb-2">💤</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">Track Health</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Monitor sleep, energy, and habits</p>
+            </div>
+          </div>
+
+          <div className="text-center mb-6">
+            <button
+              onClick={() => {
+                const input = document.querySelector('input[placeholder="Add a task..."]') as HTMLInputElement;
+                if (input) input.focus();
+              }}
+              className="px-8 py-3 font-semibold text-white rounded-xl hover:opacity-90 transition-opacity shadow-lg"
+              style={{ background: 'var(--accent-color)' }}
+            >
+              Create Your First Task
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-500 text-center">Or explore the app using the menu below</p>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell>
       <div className="max-w-6xl mx-auto xl:grid xl:grid-cols-3 xl:gap-6 xl:px-6 xl:py-6 min-h-screen">

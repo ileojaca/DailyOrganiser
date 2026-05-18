@@ -1,0 +1,284 @@
+'use client';
+export const dynamic = 'force-dynamic';
+
+import { useState } from 'react';
+import AppShell from '@/components/AppShell';
+import { useAuth } from '@/contexts/AuthContext';
+import { useGoals } from '@/hooks/useGoals';
+import { useNotifications } from '@/contexts/NotificationContext';
+
+const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Normal', 3: 'Medium', 4: 'High', 5: 'Critical' };
+const CATEGORY_EMOJI: Record<string, string> = { work: '💼', personal: '⭐', health: '🏃', learning: '📚', social: '👥', family: '👨‍👩‍👧' };
+
+function priorityBarColor(priority: number): string {
+  if (priority >= 5) return 'bg-red-500';
+  if (priority >= 4) return 'bg-orange-400';
+  if (priority >= 3) return 'bg-yellow-400';
+  if (priority >= 2) return 'bg-blue-400';
+  return 'bg-gray-300';
+}
+
+function priorityBadge(priority: number): string {
+  if (priority >= 5) return 'bg-red-100 text-red-700';
+  if (priority >= 4) return 'bg-orange-100 text-orange-700';
+  if (priority >= 3) return 'bg-yellow-100 text-yellow-700';
+  if (priority >= 2) return 'bg-blue-100 text-blue-700';
+  return 'bg-gray-100 text-gray-500';
+}
+
+function formatDeadline(deadline: Date): string {
+  const now = new Date();
+  const diff = deadline.getTime() - now.getTime();
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  if (days < 0) return `${Math.abs(days)}d overdue`;
+  if (days === 0) return 'due today';
+  if (days === 1) return 'due tomorrow';
+  return `due in ${days}d`;
+}
+
+type FilterType = 'all' | 'in_progress' | 'completed';
+type SortType = 'priority' | 'due' | 'created';
+
+export default function TasksPage() {
+  const { user } = useAuth();
+  const { goals, createGoal, updateGoal, completeGoal } = useGoals(user?.uid);
+  const { addNotification } = useNotifications();
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [sort, setSort] = useState<SortType>('priority');
+  const [quickTask, setQuickTask] = useState('');
+  const [quickCategory, setQuickCategory] = useState<'work' | 'personal' | 'health' | 'learning' | 'social' | 'family'>('personal');
+  const [quickPriority, setQuickPriority] = useState(3);
+  const [addingTask, setAddingTask] = useState(false);
+
+  const filteredTasks = goals.filter(g => {
+    if (filter === 'all') return g.status === 'pending' || g.status === 'in_progress';
+    if (filter === 'in_progress') return g.status === 'in_progress';
+    if (filter === 'completed') return g.status === 'completed';
+    return true;
+  });
+
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (sort === 'priority') return b.priority - a.priority;
+    if (sort === 'due') {
+      if (!a.deadline && !b.deadline) return 0;
+      if (!a.deadline) return 1;
+      if (!b.deadline) return -1;
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    }
+    if (sort === 'created') return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    return 0;
+  });
+
+  const handleQuickAdd = async () => {
+    if (!quickTask.trim()) return;
+    setAddingTask(true);
+    try {
+      await createGoal({
+        title: quickTask.trim(),
+        category: quickCategory,
+        priority: quickPriority,
+        estimatedDuration: 30,
+        energyRequired: 5
+      });
+      setQuickTask('');
+      addNotification({ type: 'success', title: 'Task added', message: `"${quickTask.trim()}" added to your tasks.` });
+    } finally {
+      setAddingTask(false);
+    }
+  };
+
+  const handleTaskCircleClick = async (task: typeof goals[0]) => {
+    if (task.status === 'pending') {
+      await updateGoal(task.id, { status: 'in_progress' });
+    } else if (task.status === 'in_progress') {
+      await completeGoal(task.id);
+    }
+  };
+
+  if (!user) return <AppShell><div /></AppShell>;
+
+  return (
+    <AppShell>
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">All Tasks</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage and track all your tasks</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === 'all'
+                  ? 'bg-accent text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+              style={filter === 'all' ? { background: 'var(--accent-color)' } : undefined}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilter('in_progress')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === 'in_progress'
+                  ? 'bg-accent text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+              style={filter === 'in_progress' ? { background: 'var(--accent-color)' } : undefined}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => setFilter('completed')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                filter === 'completed'
+                  ? 'bg-accent text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+              style={filter === 'completed' ? { background: 'var(--accent-color)' } : undefined}
+            >
+              Done
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="sort" className="text-sm text-gray-600 dark:text-gray-400">Sort:</label>
+            <select
+              id="sort"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortType)}
+              className="px-3 py-2 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-white"
+            >
+              <option value="priority">Priority</option>
+              <option value="due">Due Date</option>
+              <option value="created">Created</option>
+            </select>
+          </div>
+        </div>
+
+        {sortedTasks.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-8 text-center">
+            <div className="inline-block mb-4 p-3 rounded-full" style={{ background: 'color-mix(in srgb, var(--accent-color) 10%, transparent)' }}>
+              <div className="text-4xl">📋</div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              {filter === 'completed' ? 'No completed tasks yet' : 'No tasks in this view'}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 text-sm">
+              {filter === 'completed'
+                ? 'Tasks you complete will appear here'
+                : 'Create your first task below or go to the home page to get started'}
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl overflow-hidden shadow-sm">
+            {sortedTasks.map((task, idx) => (
+              <div
+                key={task.id}
+                className={`flex items-center gap-3 px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                  idx < sortedTasks.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''
+                }`}
+              >
+                <div className={`w-1 h-12 rounded-full flex-shrink-0 ${priorityBarColor(task.priority)}`} />
+                <button
+                  onClick={() => handleTaskCircleClick(task)}
+                  className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-accent flex-shrink-0 flex items-center justify-center transition-colors"
+                  style={{ borderColor: task.status === 'in_progress' ? 'var(--accent-color)' : undefined }}
+                >
+                  {task.status === 'in_progress' && (
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--accent-color)' }} />
+                  )}
+                  {task.status === 'completed' && (
+                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${task.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>
+                    {task.title}
+                  </p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-xs text-gray-400">{CATEGORY_EMOJI[task.category] || '📌'} {task.category}</span>
+                    {task.estimatedDuration && <span className="text-xs text-gray-400">· {task.estimatedDuration}m</span>}
+                    {task.deadline && (
+                      <span className={`text-xs font-medium ${new Date(task.deadline) < new Date() ? 'text-red-500' : 'text-gray-400'}`}>
+                        · {formatDeadline(task.deadline)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${priorityBadge(task.priority)}`}>
+                  {PRIORITY_LABEL[task.priority] || 'Medium'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add a new task</h2>
+          <form onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }} className="space-y-4">
+            <div>
+              <input
+                type="text"
+                value={quickTask}
+                onChange={(e) => setQuickTask(e.target.value)}
+                placeholder="What's your next task?"
+                className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent shadow-sm"
+                style={{ '--tw-ring-color': 'color-mix(in srgb, var(--accent-color) 30%, transparent)' } as React.CSSProperties}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="category" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                <select
+                  id="category"
+                  value={quickCategory}
+                  onChange={(e) => setQuickCategory(e.target.value as typeof quickCategory)}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                >
+                  <option value="work">Work</option>
+                  <option value="personal">Personal</option>
+                  <option value="health">Health</option>
+                  <option value="learning">Learning</option>
+                  <option value="social">Social</option>
+                  <option value="family">Family</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="priority" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+                <select
+                  id="priority"
+                  value={quickPriority}
+                  onChange={(e) => setQuickPriority(parseInt(e.target.value))}
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                >
+                  <option value="1">Low</option>
+                  <option value="2">Normal</option>
+                  <option value="3">Medium</option>
+                  <option value="4">High</option>
+                  <option value="5">Critical</option>
+                </select>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1">
+                <button
+                  type="submit"
+                  disabled={!quickTask.trim() || addingTask}
+                  className="w-full h-10 text-white font-semibold rounded-lg disabled:opacity-40 transition-opacity"
+                  style={{ background: 'var(--accent-color)' }}
+                >
+                  {addingTask ? 'Adding...' : 'Add Task'}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </AppShell>
+  );
+}
