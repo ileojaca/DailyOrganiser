@@ -30,6 +30,20 @@ export async function verifyAuthToken(request: NextRequest): Promise<string | nu
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return null;
   const token = authHeader.slice(7);
+
+  // Development mode: if Firebase service account not configured, extract uid from token
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON && process.env.NODE_ENV === 'development') {
+    try {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+        return payload.sub || payload.user_id || null;
+      }
+    } catch {
+      // Fall through
+    }
+  }
+
   try {
     const decoded = await getAdminAuth().verifyIdToken(token);
     return decoded.uid;

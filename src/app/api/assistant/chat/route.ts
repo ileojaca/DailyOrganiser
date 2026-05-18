@@ -80,7 +80,12 @@ const TOOLS: Anthropic.Messages.Tool[] = [
 
 export async function POST(request: NextRequest) {
   const uid = await verifyAuthToken(request);
-  if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!uid) {
+    return NextResponse.json(
+      { error: 'Unauthorized - Firebase not configured or token invalid. Set FIREBASE_SERVICE_ACCOUNT_JSON env var.' },
+      { status: 401 }
+    );
+  }
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openrouterKey = process.env.OPENROUTER_API_KEY;
