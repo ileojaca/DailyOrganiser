@@ -82,8 +82,12 @@ export async function POST(request: NextRequest) {
   const uid = await verifyAuthToken(request);
   if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return NextResponse.json({ error: 'AI not configured' }, { status: 503 });
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+
+  if (!anthropicKey && !openrouterKey) {
+    return NextResponse.json({ error: 'AI not configured' }, { status: 503 });
+  }
 
   const { message, conversationHistory = [] } = await request.json();
 
@@ -149,7 +153,13 @@ RULES:
 - If it's evening, suggest winding down and reviewing tomorrow
 - Use tools liberally — actually DO things, don't just talk about them`;
 
-  const client = new Anthropic({ apiKey });
+  const client = anthropicKey
+    ? new Anthropic({ apiKey: anthropicKey })
+    : new Anthropic({
+        apiKey: openrouterKey!,
+        baseURL: 'https://openrouter.ai/api/v1',
+      });
+
   const recentHistory = conversationHistory.slice(-10);
   const messages: Anthropic.Messages.MessageParam[] = [
     ...recentHistory,
@@ -157,7 +167,7 @@ RULES:
   ];
 
   const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'anthropic/claude-3.5-haiku',
     max_tokens: 1024,
     system: systemPrompt,
     tools: TOOLS,
