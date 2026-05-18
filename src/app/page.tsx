@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useGamification } from '@/hooks/useGamification';
+import { useSleepAndEnergy } from '@/hooks/useSleepAndEnergy';
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Normal', 3: 'Medium', 4: 'High', 5: 'Critical' };
 const CATEGORY_EMOJI: Record<string, string> = { work: '💼', personal: '⭐', health: '🏃', learning: '📚', social: '👥', family: '👨‍👩‍👧' };
@@ -49,6 +50,7 @@ export default function Home() {
   const { goals, createGoal, updateGoal, completeGoal } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
   const { progress: gamificationProgress } = useGamification();
+  const { sleep, energy } = useSleepAndEnergy(user?.uid);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [alertsFired, setAlertsFired] = useState(false);
   const [quickTask, setQuickTask] = useState('');
@@ -320,7 +322,7 @@ export default function Home() {
 
           {/* Optimized Schedule */}
           <div className="px-4 mb-4">
-            <OptimizedDaySchedule tasks={activeTasks} currentEnergy={5} sleepHours={7} />
+            <OptimizedDaySchedule tasks={activeTasks} currentEnergy={energy.currentLevel} sleepHours={sleep.lastNightHours} />
           </div>
 
           {/* Task section */}

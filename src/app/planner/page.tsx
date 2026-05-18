@@ -6,10 +6,12 @@ import AppShell from '@/components/AppShell';
 import SmartTimeBlocking from '@/components/SmartTimeBlocking';
 import DayViewCalendar from '@/components/DayViewCalendar';
 import InlineTaskScheduler from '@/components/InlineTaskScheduler';
+import SmartSchedulingPanel from '@/components/SmartSchedulingPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimeBlocks, TimeBlock } from '@/hooks/useTimeBlocks';
 import { useGoals, Goal } from '@/hooks/useGoals';
 import { useAccomplishmentLogs } from '@/hooks/useAccomplishmentLogs';
+import { useSleepAndEnergy } from '@/hooks/useSleepAndEnergy';
 import { detectBurnoutRisk } from '@/utils/productivityPrediction';
 import { AdaptiveScheduler } from '@/utils/adaptiveScheduler';
 
@@ -52,6 +54,7 @@ export default function PlannerPage() {
   const { timeBlocks, loading, createTimeBlock, deleteTimeBlock } = useTimeBlocks(user?.uid);
   const { goals, loading: goalsLoading, updateGoal } = useGoals(user?.uid);
   const { logs } = useAccomplishmentLogs(user?.uid);
+  const { sleep, energy } = useSleepAndEnergy(user?.uid);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -341,22 +344,18 @@ export default function PlannerPage() {
           </div>
         )}
 
-        <div className="bg-green-50 rounded-xl border border-green-200 p-4 mb-4">
-          <p className="text-sm text-green-700">Use AI Auto-Schedule to map your current goals into this week's calendar.</p>
-          <div className="mt-3 flex gap-2 items-center">
-            <button
-              onClick={autoScheduleGoals}
-              disabled={scheduling || (goalsLoading && loading)}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40"
-            >
-              {scheduling ? 'Scheduling...' : 'AI Auto-Schedule Goals'}
-            </button>
-            <span className="text-xs text-gray-600">
-              {scheduledCount > 0 && `Scheduled: ${scheduledCount}`}
-              {unscheduledCount > 0 && ` | Unscheduled: ${unscheduledCount}`}
-            </span>
-          </div>
-          {scheduleInfo && <p className="text-xs mt-2 text-green-800">{scheduleInfo}</p>}
+        <div className="mb-4">
+          <SmartSchedulingPanel
+            tasks={pendingGoals}
+            currentEnergy={energy.currentLevel}
+            sleepHours={sleep.lastNightHours}
+            workLifeBalance={{ work: 40, personal: 30, health: 15, learning: 15 }}
+            onScheduleGenerated={(schedule) => {
+              if (schedule.schedule.length > 0) {
+                setScheduleInfo(`Generated optimal schedule for ${schedule.schedule.length} tasks`);
+              }
+            }}
+          />
         </div>
 
         {pendingGoals.length > 0 && (
