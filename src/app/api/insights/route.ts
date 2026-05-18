@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { verifyAuthToken, getAdminDb } from '@/lib/firebaseAdmin';
+import { callAI, type AIProvider } from '@/lib/aiClient';
 import { predictTaskCompletion, findOptimalTimeSlots, generateWorkloadForecast, advancedWorkloadForecast, detectBurnoutRisk } from '@/utils/productivityPrediction';
 
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -14,70 +14,85 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type') || 'overview';
     const days = parseInt(searchParams.get('days') || '7');
 
-    // Fetch user's accomplishment logs
-    const { data: logs, error: logsError } = await supabase
-      .from('accomplishment_logs')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('scheduled_date', { ascending: false })
-      .limit(100);
+    // Fetch user's goals as accomplishment logs
+    const goalsSnapshot = await getAdminDb().collection('users').doc(uid).collection('goals').orderBy('createdAt', 'desc').limit(100).get();
+    const logs = goalsSnapshot.docs.map(d => {
+      const data = d.data();
+      const scheduledDate = data.scheduledDate || data.createdAt?.toDate?.()?.toISOString?.()?.split('T')[0] || new Date().toISOString().split('T')[0];
+      const isCompleted = data.status === 'completed';
+      return {
+        id: d.id,
+        userId: uid,
+        goalId: d.id,
+        scheduledDate,
+        scheduledHour: data.scheduledHour ?? 9,
+        actualDuration: data.actualDuration,
+        completionStatus: (isCompleted ? 'completed' : 'abandoned') as 'completed' | 'partial' | 'abandoned',
+        energyLevelAtStart: data.energyRequired,
+        contextSnapshot: {},
+        efficiencyScore: isCompleted ? 0.8 : 0,
+        createdAt: data.createdAt?.toDate?.() || new Date(),
+        // extra fields for local filtering
+        completion_status: isCompleted ? 'completed' : 'pending',
+        efficiency_score: isCompleted ? 8 : 0,
+        scheduled_date: scheduledDate,
+        category: data.category,
+        status: data.status,
+      };
+    });
 
-    if (logsError) {
-      console.error('Error fetching logs:', logsError);
-      return NextResponse.json({ error: 'Failed to fetch logs' }, { status: 500 });
-    }
-
-    // Fetch scheduled tasks
-    const { data: tasks, error: tasksError } = await supabase
-      .from('goals')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('scheduled_date', new Date().toISOString().split('T')[0]);
-
-    if (tasksError) {
-      console.error('Error fetching tasks:', tasksError);
-      return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
-    }
+    // Fetch scheduled tasks (upcoming)
+    const today = new Date().toISOString().split('T')[0];
+    const scheduledSnapshot = await getAdminDb().collection('users').doc(uid).collection('goals').get();
+    const tasks = scheduledSnapshot.docs
+      .map(d => ({ ...d.data(), id: d.id }))
+      .filter((t: Record<string, unknown>) => {
+        const scheduledDate = t.scheduledDate as string | undefined;
+        return scheduledDate && scheduledDate >= today;
+      });
 
     // Group tasks by date
-    const scheduledTasks = tasks?.reduce((acc: Array<{ date: string; count: number }>, task: { scheduled_date: string }) => {
-      const existing = acc.find(t => t.date === task.scheduled_date);
+    const scheduledTasks = tasks.reduce((acc: Array<{ date: string; count: number }>, task: Record<string, unknown>) => {
+      const scheduledDate = task.scheduledDate as string;
+      const existing = acc.find(t => t.date === scheduledDate);
       if (existing) {
         existing.count++;
       } else {
-        acc.push({ date: task.scheduled_date, count: 1 });
+        acc.push({ date: scheduledDate, count: 1 });
       }
       return acc;
-    }, []) || [];
+    }, []);
 
     let insights: Record<string, unknown> = {};
 
     switch (type) {
-      case 'overview':
-        const forecast = generateWorkloadForecast(logs || [], scheduledTasks, days);
-        const burnoutRisk = detectBurnoutRisk(logs || [], scheduledTasks);
-        
+      case 'overview': {
+        const forecast = generateWorkloadForecast(logs, scheduledTasks, days);
+        const burnoutRisk = detectBurnoutRisk(logs, scheduledTasks);
+
         insights = {
           forecast,
           burnoutRisk,
           summary: {
-            totalTasks: logs?.length || 0,
-            completedTasks: logs?.filter((l: { completion_status: string }) => l.completion_status === 'completed').length || 0,
-            averageEfficiency: logs?.reduce((sum: number, l: { efficiency_score?: number }) => sum + (l.efficiency_score || 0), 0) / (logs?.length || 1),
+            totalTasks: logs.length,
+            completedTasks: logs.filter((l: { completion_status: string }) => l.completion_status === 'completed').length,
+            averageEfficiency: logs.reduce((sum: number, l: { efficiency_score?: number }) => sum + (l.efficiency_score || 0), 0) / (logs.length || 1),
           }
         };
         break;
+      }
 
-      case 'forecast':
-        const advancedForecast = advancedWorkloadForecast(logs || [], scheduledTasks, days);
+      case 'forecast': {
+        const advancedForecast = advancedWorkloadForecast(logs, scheduledTasks, days);
         insights = advancedForecast;
         break;
+      }
 
       case 'burnout':
-        insights = detectBurnoutRisk(logs || [], scheduledTasks);
+        insights = detectBurnoutRisk(logs, scheduledTasks);
         break;
 
-      case 'optimal-times':
+      case 'optimal-times': {
         const category = searchParams.get('category') || 'work';
         const priority = parseInt(searchParams.get('priority') || '3');
         const duration = parseInt(searchParams.get('duration') || '60');
@@ -85,11 +100,41 @@ export async function GET(request: NextRequest) {
 
         const optimalSlots = findOptimalTimeSlots(
           { category, priority, estimatedDuration: duration, energyRequired },
-          logs || [],
+          logs,
           new Date().toISOString().split('T')[0]
         );
         insights = { optimalSlots };
         break;
+      }
+
+      case 'ai-summary': {
+        const aiProvider = (searchParams.get('aiProvider') as AIProvider) || 'auto';
+        const aiModel = searchParams.get('aiModel') || undefined;
+
+        const completedCount = logs.filter((l: any) => l.completion_status === 'completed').length;
+        const totalCount = logs.length;
+        const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+        const prompt = `You are a productivity coach. Based on this user's data, provide 3 specific, actionable insights in JSON format.
+
+User stats (last ${days} days):
+- Tasks completed: ${completedCount} of ${totalCount} (${completionRate}%)
+- Categories: ${[...new Set(logs.map((l: any) => l.category))].join(', ') || 'none'}
+
+Return JSON: { "insights": [{ "title": "string", "insight": "string", "action": "string" }] }`;
+
+        const text = await callAI({ provider: aiProvider, model: aiModel, prompt, maxTokens: 400 });
+        if (!text) {
+          insights = { summary: 'AI insights unavailable. Configure ANTHROPIC_API_KEY or OPENROUTER_API_KEY.' };
+          break;
+        }
+        try {
+          insights = JSON.parse(text);
+        } catch {
+          insights = { insights: [] };
+        }
+        break;
+      }
 
       default:
         return NextResponse.json({ error: 'Invalid insight type' }, { status: 400 });
@@ -104,42 +149,48 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
     const { taskCategory, taskPriority, estimatedDuration, energyRequired, scheduledDate, scheduledHour } = body;
 
-    // Predict completion probability
-    const prediction = predictTaskCompletion({
-      hourOfDay: scheduledHour || new Date().getHours(),
-      dayOfWeek: new Date(scheduledDate || new Date()).getDay(),
-      energyLevel: energyRequired || 5,
-      taskCategory: taskCategory || 'work',
-      taskPriority: taskPriority || 3,
-      estimatedDuration: estimatedDuration || 60,
-      currentWorkload: 0, // Will be calculated from scheduled tasks
-      recentCompletionRate: 0.5, // Will be calculated from logs
-      streakDays: 0, // Will be calculated from logs
-    });
-
     // Fetch recent logs to calculate actual metrics
-    const { data: recentLogs } = await supabase
-      .from('accomplishment_logs')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('scheduled_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const recentSnapshot = await getAdminDb().collection('users').doc(uid).collection('goals').orderBy('createdAt', 'desc').limit(100).get();
+    const recentLogs = recentSnapshot.docs
+      .map(d => {
+        const data = d.data();
+        const scheduledDate = data.scheduledDate || data.createdAt?.toDate?.()?.toISOString?.()?.split('T')[0] || new Date().toISOString().split('T')[0];
+        const isCompleted = data.status === 'completed';
+        return {
+          id: d.id,
+          userId: uid,
+          goalId: d.id,
+          scheduledDate,
+          scheduledHour: data.scheduledHour ?? 9,
+          actualDuration: data.actualDuration,
+          completionStatus: (isCompleted ? 'completed' : 'abandoned') as 'completed' | 'partial' | 'abandoned',
+          energyLevelAtStart: data.energyRequired,
+          contextSnapshot: {},
+          efficiencyScore: isCompleted ? 0.8 : 0,
+          createdAt: data.createdAt?.toDate?.() || new Date(),
+          completion_status: isCompleted ? 'completed' : 'pending',
+          efficiency_score: isCompleted ? 8 : 0,
+          scheduled_date: scheduledDate,
+        };
+      })
+      .filter((l: { scheduled_date?: string }) => l.scheduled_date && l.scheduled_date >= sevenDaysAgo);
 
-    const recentCompletionRate = recentLogs && recentLogs.length > 0
+    const recentCompletionRate = recentLogs.length > 0
       ? recentLogs.filter((l: { completion_status: string }) => l.completion_status === 'completed').length / recentLogs.length
       : 0.5;
 
     // Calculate streak
-    const sortedLogs = [...(recentLogs || [])].sort((a: { scheduled_date: string }, b: { scheduled_date: string }) => 
-      new Date(b.scheduled_date).getTime() - new Date(a.scheduled_date).getTime()
+    const sortedLogs = [...recentLogs].sort((a: { scheduled_date?: string }, b: { scheduled_date?: string }) =>
+      new Date(b.scheduled_date || 0).getTime() - new Date(a.scheduled_date || 0).getTime()
     );
     let streakDays = 0;
     for (const log of sortedLogs) {
@@ -150,7 +201,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update prediction with actual metrics
+    // Predict with actual metrics
     const updatedPrediction = predictTaskCompletion({
       hourOfDay: scheduledHour || new Date().getHours(),
       dayOfWeek: new Date(scheduledDate || new Date()).getDay(),
@@ -168,7 +219,7 @@ export async function POST(request: NextRequest) {
       metrics: {
         recentCompletionRate,
         streakDays,
-        totalRecentTasks: recentLogs?.length || 0,
+        totalRecentTasks: recentLogs.length,
       }
     });
   } catch (error) {

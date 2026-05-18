@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import AppShell from '@/components/AppShell';
 import { SUBSCRIPTION_TIERS, getTierById } from '@/config/subscriptionTiers';
+import { ANTHROPIC_MODELS, OPENROUTER_MODELS, type AIProvider } from '@/lib/aiClient';
 
 interface UserProfile {
   email: string;
@@ -18,7 +19,9 @@ interface UserProfile {
 export default function SettingsPage() {
   const { user, profile, updateProfile, signOut } = useAuth();
   const { mode, setMode, accentColor, setAccentColor } = useTheme();
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'appearance' | 'subscription' | 'account'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'appearance' | 'ai' | 'subscription' | 'account'>('profile');
+  const [aiProvider, setAiProvider] = useState<AIProvider>('auto');
+  const [aiModel, setAiModel] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
@@ -33,6 +36,9 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (profile) {
+      const p = profile as any;
+      setAiProvider((p.aiProvider as AIProvider) || 'auto');
+      setAiModel(p.aiModel || '');
       setFormData({
         fullName: profile.fullName || '',
         timezone: profile.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
@@ -42,6 +48,19 @@ export default function SettingsPage() {
       });
     }
   }, [profile]);
+
+  const handleSaveAI = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      await updateProfile({ aiProvider, aiModel } as any);
+      setMessage({ type: 'success', text: 'AI settings saved!' });
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to save AI settings.' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -125,6 +144,7 @@ export default function SettingsPage() {
             { id: 'profile', label: 'Profile' },
             { id: 'notifications', label: 'Notifications' },
             { id: 'appearance', label: 'Appearance' },
+            { id: 'ai', label: 'AI' },
             { id: 'subscription', label: 'Subscription' },
             { id: 'account', label: 'Account' },
           ].map((tab) => (
@@ -378,6 +398,73 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* AI Tab */}
+        {activeTab === 'ai' && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
+            <div>
+              <h3 className="font-medium text-gray-900 dark:text-white mb-1">AI Provider</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                Choose how AI features work. Auto tries Anthropic first, then falls back to OpenRouter.
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: 'auto', label: 'Auto', desc: 'Anthropic → OpenRouter fallback' },
+                  { value: 'anthropic', label: 'Anthropic', desc: 'Direct Claude API' },
+                  { value: 'openrouter', label: 'OpenRouter', desc: '100+ models available' },
+                ].map((p) => (
+                  <button
+                    key={p.value}
+                    onClick={() => { setAiProvider(p.value as AIProvider); setAiModel(''); }}
+                    className={`p-3 rounded-lg border text-left transition-colors ${
+                      aiProvider === p.value
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                    }`}
+                  >
+                    <div className="font-medium text-gray-900 dark:text-white text-sm">{p.label}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{p.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {aiProvider !== 'auto' && (
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white mb-1">Model</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                  {aiProvider === 'openrouter'
+                    ? 'Free models are available on OpenRouter with no usage cost.'
+                    : 'Haiku is fastest and cheapest. Opus is most capable.'}
+                </p>
+                <select
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="">Default</option>
+                  {(aiProvider === 'anthropic' ? ANTHROPIC_MODELS : OPENROUTER_MODELS).map((m) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+              <p className="font-medium mb-1">Required environment variables</p>
+              <p>Anthropic: <code className="font-mono">ANTHROPIC_API_KEY</code></p>
+              <p>OpenRouter: <code className="font-mono">OPENROUTER_API_KEY</code></p>
+            </div>
+
+            <button
+              onClick={handleSaveAI}
+              disabled={saving}
+              className="w-full py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : 'Save AI Settings'}
+            </button>
           </div>
         )}
 

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { SleepRecord, SleepAnalysis } from '@/types/lifeManagement';
+import { getDb } from '@/lib/firebase';
+import { collection, getDocs, addDoc, query, orderBy, limit, Timestamp } from 'firebase/firestore';
 
 export default function SleepTracker() {
   const { user } = useAuth();
@@ -21,14 +23,36 @@ export default function SleepTracker() {
   useEffect(() => {
     if (!user) return;
 
-    // Load from localStorage
-    const saved = localStorage.getItem(`sleep_records_${user.uid}`);
-    if (saved) {
-      const records = JSON.parse(saved);
-      setSleepRecords(records);
-      analyzeSleep(records);
-    }
-    setLoading(false);
+    const loadRecords = async () => {
+      try {
+        const db = getDb();
+        const q = query(
+          collection(db, 'users', user.uid, 'sleepRecords'),
+          orderBy('date', 'desc'),
+          limit(30)
+        );
+        const snapshot = await getDocs(q);
+        const records: SleepRecord[] = snapshot.docs.map(docSnap => {
+          const data = docSnap.data();
+          return {
+            ...data,
+            id: docSnap.id,
+            date: data.date instanceof Timestamp ? data.date.toDate() : new Date(data.date),
+            bedtime: data.bedtime?.toDate ? data.bedtime.toDate() : new Date(data.bedtime),
+            wakeTime: data.wakeTime?.toDate ? data.wakeTime.toDate() : new Date(data.wakeTime),
+            createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+          } as SleepRecord;
+        });
+        setSleepRecords(records);
+        analyzeSleep(records);
+      } catch (err) {
+        console.error('Error loading sleep records from Firestore:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRecords();
   }, [user]);
 
   const analyzeSleep = (records: SleepRecord[]) => {
@@ -96,7 +120,7 @@ export default function SleepTracker() {
     });
   };
 
-  const addSleepRecord = () => {
+  const addSleepRecord = async () => {
     if (!user) return;
 
     const bedtime = new Date(`2000-01-01T${newSleep.bedtime}`);
@@ -106,8 +130,7 @@ export default function SleepTracker() {
     }
     const duration = Math.round((wakeTime.getTime() - bedtime.getTime()) / (1000 * 60));
 
-    const record: SleepRecord = {
-      id: `sleep_${Date.now()}`,
+    const recordData = {
       userId: user.uid,
       date: new Date(),
       bedtime: new Date(`2000-01-01T${newSleep.bedtime}`),
@@ -116,14 +139,21 @@ export default function SleepTracker() {
       quality: newSleep.quality,
       awakenings: newSleep.awakenings,
       notes: newSleep.notes || undefined,
-      source: 'manual',
+      source: 'manual' as const,
       createdAt: new Date(),
     };
 
-    const updated = [record, ...sleepRecords];
-    setSleepRecords(updated);
-    localStorage.setItem(`sleep_records_${user.uid}`, JSON.stringify(updated));
-    analyzeSleep(updated);
+    try {
+      const db = getDb();
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'sleepRecords'), recordData);
+      const record: SleepRecord = { ...recordData, id: docRef.id };
+      const updated = [record, ...sleepRecords];
+      setSleepRecords(updated);
+      analyzeSleep(updated);
+    } catch (err) {
+      console.error('Error adding sleep record to Firestore:', err);
+    }
+
     setShowAddSleep(false);
     setNewSleep({ bedtime: '23:00', wakeTime: '07:00', quality: 7, awakenings: 0, notes: '' });
   };

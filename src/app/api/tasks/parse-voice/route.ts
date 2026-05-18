@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseTaskInput, generateConfirmation } from '@/utils/voiceTaskParser';
 import { createTask } from '@/lib/firebaseUtils';
+import { callAI, type AIProvider } from '@/lib/aiClient';
+
+async function parseWithAI(input: string, provider?: AIProvider, model?: string) {
+  const prompt = `Parse this task description into structured data. Return ONLY valid JSON, no explanation.
+
+Input: "${input}"
+
+Return JSON with these fields:
+{
+  "taskTitle": "string (required)",
+  "category": "homework|work|chores|exercise|social|personal|family|rest",
+  "priority": 1-5 (5=urgent),
+  "duration": minutes as number,
+  "energyRequired": 1-10,
+  "scheduledTime": "ISO datetime string or null",
+  "confidence": 0.0-1.0
+}`;
+
+  const text = await callAI({ provider, model, prompt, maxTokens: 300 });
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /api/tasks/parse-voice
@@ -21,15 +47,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { input, text, createImmediate = false } = body;
+    const { input, text, createImmediate = false, aiProvider, aiModel } = body;
     const normalizedInput = typeof input === 'string' ? input : typeof text === 'string' ? text : '';
 
     if (!normalizedInput.trim()) {
       return NextResponse.json({ error: 'Input text is required' }, { status: 400 });
     }
 
-    // Parse the input
-    const parsed = parseTaskInput(normalizedInput);
+    // Parse the input — try AI first, fall back to regex
+    let parsed = await parseWithAI(normalizedInput, aiProvider, aiModel);
+    if (!parsed) {
+      parsed = parseTaskInput(normalizedInput);
+    }
 
     if (!parsed.taskTitle) {
       return NextResponse.json(

@@ -1,41 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { verifyAuthToken, getAdminDb } from '@/lib/firebaseAdmin';
 
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const uid = await verifyAuthToken(request);
+    if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const db = getAdminDb();
+    const userRef = db.collection('users').doc(uid);
 
-    // Fetch all user data
-    const [profileData, goalsData, timeBlocksData, logsData, teamsData] = await Promise.all([
-      supabase.from('user_profiles').select('*').eq('user_id', user.id).single(),
-      supabase.from('goals').select('*').eq('user_id', user.id),
-      supabase.from('time_blocks').select('*').eq('user_id', user.id),
-      supabase.from('accomplishment_logs').select('*').eq('user_id', user.id),
-      supabase.from('team_members').select('teams(*)').eq('user_id', user.id),
+    const [profileDoc, goalsSnap, sleepSnap, familyMembersSnap, familyEventsSnap] = await Promise.all([
+      userRef.get(),
+      userRef.collection('goals').orderBy('createdAt', 'desc').get(),
+      userRef.collection('sleepRecords').orderBy('date', 'desc').limit(90).get(),
+      userRef.collection('familyMembers').get(),
+      userRef.collection('familyEvents').get(),
     ]);
 
     const exportData = {
-      profile: profileData.data,
-      goals: goalsData.data || [],
-      timeBlocks: timeBlocksData.data || [],
-      accomplishmentLogs: logsData.data || [],
-      teams: teamsData.data?.map((tm: { teams: unknown }) => tm.teams) || [],
+      profile: profileDoc.data() || {},
+      goals: goalsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      sleepRecords: sleepSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      familyMembers: familyMembersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      familyEvents: familyEventsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
       exportedAt: new Date().toISOString(),
     };
 
+    const { format = 'json' } = await request.json().catch(() => ({ format: 'json' }));
+
+    if (format === 'csv') {
+      const goalsCsv = [
+        'id,title,category,status,priority,createdAt,completedAt',
+        ...exportData.goals.map((g: any) =>
+          `${g.id},"${g.title || ''}",${g.category || ''},${g.status || ''},${g.priority || ''},${g.createdAt?.toDate?.()?.toISOString() || ''},${g.completedAt?.toDate?.()?.toISOString() || ''}`
+        ),
+      ].join('\n');
+      return new NextResponse(goalsCsv, {
+        headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="dailyorganiser-export.csv"' },
+      });
+    }
+
     return new NextResponse(JSON.stringify(exportData, null, 2), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Disposition': `attachment; filename="dailyorganiser-export-${new Date().toISOString().split('T')[0]}.json"`,
-      },
+      headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="dailyorganiser-export.json"' },
     });
   } catch (error) {
-    console.error('Error exporting data:', error);
-    return NextResponse.json({ error: 'Failed to export data' }, { status: 500 });
+    console.error('Export error:', error);
+    return NextResponse.json({ error: 'Export failed' }, { status: 500 });
   }
 }

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { LifeAdvice, WeeklyLifeReview, BurnoutPrediction } from '@/types/lifeManagement';
+import { getDb } from '@/lib/firebase';
+import { collection, getDocs, getDoc, doc, query, orderBy, limit } from 'firebase/firestore';
 
 export default function AIAdvisory() {
   const { user } = useAuth();
@@ -15,125 +17,249 @@ export default function AIAdvisory() {
   useEffect(() => {
     if (!user) return;
 
-    // Load from localStorage
-    const savedAdvice = localStorage.getItem(`life_advice_${user.uid}`);
-    const savedReview = localStorage.getItem(`weekly_review_${user.uid}`);
-    const savedBurnout = localStorage.getItem(`burnout_prediction_${user.uid}`);
+    const loadAndComputeInsights = async () => {
+      try {
+        const db = getDb();
+        const uid = user.uid;
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    if (savedAdvice) setAdvice(JSON.parse(savedAdvice));
-    if (savedReview) setWeeklyReview(JSON.parse(savedReview));
-    if (savedBurnout) setBurnoutPrediction(JSON.parse(savedBurnout));
+        // Fetch all data in parallel
+        const [goalsSnap, energySnap, sleepSnap, gamificationSnap] = await Promise.all([
+          getDocs(query(collection(db, 'users', uid, 'goals'), orderBy('createdAt', 'desc'), limit(50))),
+          getDocs(query(collection(db, 'users', uid, 'energyLogs'), orderBy('date', 'desc'), limit(14))),
+          getDocs(query(collection(db, 'users', uid, 'sleepRecords'), orderBy('date', 'desc'), limit(14))),
+          getDoc(doc(db, 'users', uid, 'gamification', 'profile')),
+        ]);
 
-    // Generate sample advice if none exists
-    if (!savedAdvice) {
-      const sampleAdvice: LifeAdvice[] = [
-        {
-          id: 'advice_1',
-          userId: user.uid,
-          category: 'productivity',
-          insight: 'Your productivity peaks between 9-11 AM. Schedule your most important tasks during this window.',
-          actionItems: ['Block 9-11 AM for deep work', 'Avoid meetings during peak hours'],
-          evidence: ['Based on your task completion patterns', 'Consistent with your chronotype'],
-          confidence: 0.85,
-          dismissed: false,
-          createdAt: new Date(),
-        },
-        {
-          id: 'advice_2',
-          userId: user.uid,
-          category: 'wellness',
-          insight: 'You\'ve been working late 3 nights this week. Consider setting a hard stop at 6 PM.',
-          actionItems: ['Set a calendar reminder for 5:30 PM', 'Plan evening activities'],
-          evidence: ['Sleep quality decreased by 15%', 'Increased caffeine consumption detected'],
-          confidence: 0.78,
-          dismissed: false,
-          createdAt: new Date(),
-        },
-        {
-          id: 'advice_3',
-          userId: user.uid,
-          category: 'relationships',
-          insight: 'It\'s been 5 days since you scheduled family time. Your family connection score is declining.',
-          actionItems: ['Plan a family dinner this weekend', 'Call a friend today'],
-          evidence: ['Last family event: 5 days ago', 'Social interactions down 30%'],
-          confidence: 0.92,
-          dismissed: false,
-          createdAt: new Date(),
-        },
-      ];
-      setAdvice(sampleAdvice);
-      localStorage.setItem(`life_advice_${user.uid}`, JSON.stringify(sampleAdvice));
-    }
+        const goals = goalsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        const energyLogs = energySnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        const sleepRecords = sleepSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
+        const gamification = gamificationSnap.exists() ? gamificationSnap.data() : null;
 
-    // Generate sample weekly review if none exists
-    if (!savedReview) {
-      const sampleReview: WeeklyLifeReview = {
-        id: 'review_1',
-        userId: user.uid,
-        weekStart: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        weekEnd: new Date(),
-        workLifeBalance: 65,
-        familyTime: 8,
-        personalTime: 5,
-        restQuality: 7,
-        insights: [
-          'You completed 85% of your planned tasks',
-          'Family time increased by 20% from last week',
-          'Sleep quality improved with consistent bedtime',
-        ],
-        recommendations: [
-          'Try to add one more hour of personal time next week',
-          'Schedule a digital detox on Sunday',
-          'Plan a date night with your partner',
-        ],
-        celebrations: [
-          'Completed your first 5K run!',
-          'Finished the quarterly report ahead of schedule',
-          'Maintained a 7-day meditation streak',
-        ],
-        warnings: [
-          'Screen time exceeded 8 hours on 3 days',
-          'Skipped lunch twice this week',
-        ],
-        createdAt: new Date(),
-      };
-      setWeeklyReview(sampleReview);
-      localStorage.setItem(`weekly_review_${user.uid}`, JSON.stringify(sampleReview));
-    }
+        // --- Compute advice ---
+        const computedAdvice: LifeAdvice[] = [];
 
-    // Generate sample burnout prediction if none exists
-    if (!savedBurnout) {
-      const sampleBurnout: BurnoutPrediction = {
-        userId: user.uid,
-        riskLevel: 'medium',
-        confidence: 0.72,
-        factors: [
-          'Working 50+ hours for 3 consecutive weeks',
-          'Decreased social interactions',
-          'Increased caffeine consumption',
-          'Sleep quality declining',
-        ],
-        recommendations: [
-          'Take a long weekend (3 days) within the next 2 weeks',
-          'Delegate 2-3 tasks to team members',
-          'Schedule daily 15-minute breaks',
-          'Reduce screen time after 8 PM',
-        ],
-        timeToBurnout: 21,
-        predictedAt: new Date(),
-      };
-      setBurnoutPrediction(sampleBurnout);
-      localStorage.setItem(`burnout_prediction_${user.uid}`, JSON.stringify(sampleBurnout));
-    }
+        const recentCompletedGoals = goals.filter(g => {
+          if (!g.completedAt) return false;
+          const completedAt = g.completedAt?.toDate ? g.completedAt.toDate() : new Date(g.completedAt);
+          return completedAt >= sevenDaysAgo;
+        });
 
-    setLoading(false);
+        if (recentCompletedGoals.length === 0) {
+          computedAdvice.push({
+            id: 'a1',
+            userId: uid,
+            category: 'productivity',
+            insight: 'No tasks completed this week. Start with one small goal today.',
+            actionItems: ['Pick your easiest pending goal', 'Set a 25-minute focus session'],
+            evidence: ['0 completions in the last 7 days'],
+            confidence: 0.9,
+            dismissed: false,
+            createdAt: now,
+          });
+        }
+
+        const avgSleep = sleepRecords.length > 0
+          ? sleepRecords.reduce((sum: number, r: any) => sum + (r.duration || 0), 0) / sleepRecords.length
+          : null;
+
+        if (avgSleep !== null && avgSleep < 420) {
+          computedAdvice.push({
+            id: 'a2',
+            userId: uid,
+            category: 'wellness',
+            insight: `Your average sleep is ${Math.round(avgSleep / 60)}h ${Math.round(avgSleep % 60)}m, below the recommended 7 hours. Prioritize rest to improve performance.`,
+            actionItems: ['Set a consistent bedtime', 'Avoid screens 30 minutes before bed'],
+            evidence: [`Average sleep duration: ${Math.round(avgSleep)} minutes over last ${sleepRecords.length} records`],
+            confidence: 0.85,
+            dismissed: false,
+            createdAt: now,
+          });
+        }
+
+        const familyGoals = goals.filter((g: any) => g.category === 'family');
+        const hasUserProfile = gamification !== null;
+        const familyPlan = hasUserProfile ? gamification?.familyPlan : null;
+        if (familyGoals.length === 0 && familyPlan) {
+          computedAdvice.push({
+            id: 'a3',
+            userId: uid,
+            category: 'relationships',
+            insight: 'You have family time in your plan but no family goals set yet. Add a family goal to stay connected.',
+            actionItems: ['Schedule a family activity this week', 'Add a recurring family event'],
+            evidence: ['No family-category goals found', 'Family plan is configured'],
+            confidence: 0.8,
+            dismissed: false,
+            createdAt: now,
+          });
+        }
+
+        const streak = gamification?.currentStreak || 0;
+        if (streak > 3) {
+          computedAdvice.push({
+            id: 'a4',
+            userId: uid,
+            category: 'growth',
+            insight: `You're on a ${streak}-day streak! Keep up the momentum and challenge yourself with a harder goal.`,
+            actionItems: ['Review your current goals', 'Add one stretch goal for the week'],
+            evidence: [`Current streak: ${streak} days`],
+            confidence: 0.95,
+            dismissed: false,
+            createdAt: now,
+          });
+        }
+
+        setAdvice(computedAdvice);
+
+        // --- Compute weekly review ---
+        const completedThisWeek = goals.filter((g: any) => {
+          if (!g.completedAt) return false;
+          const completedAt = g.completedAt?.toDate ? g.completedAt.toDate() : new Date(g.completedAt);
+          return completedAt >= weekStart;
+        });
+
+        const workGoalsCompleted = completedThisWeek.filter((g: any) => g.category === 'work').length;
+        const totalCompleted = completedThisWeek.length;
+        const workLifeBalance = totalCompleted > 0
+          ? Math.round(100 - (workGoalsCompleted / totalCompleted) * 100)
+          : 50;
+
+        const familyEventsThisWeek = completedThisWeek.filter((g: any) => g.category === 'family');
+        const familyTimeHours = familyEventsThisWeek.reduce((sum: number, g: any) => sum + ((g.estimatedDuration || 60) / 60), 0);
+
+        const personalGoalsCompleted = completedThisWeek.filter((g: any) =>
+          ['personal', 'health', 'learning'].includes(g.category)
+        );
+        const personalTimeHours = personalGoalsCompleted.reduce((sum: number, g: any) => sum + ((g.estimatedDuration || 60) / 60), 0);
+
+        const avgSleepQuality = sleepRecords.length > 0
+          ? sleepRecords.reduce((sum: number, r: any) => sum + (r.quality || 7), 0) / sleepRecords.length
+          : 7;
+
+        const overdueGoals = goals.filter((g: any) => {
+          if (g.completedAt) return false;
+          if (!g.targetDate) return false;
+          const targetDate = g.targetDate?.toDate ? g.targetDate.toDate() : new Date(g.targetDate);
+          return targetDate < now;
+        });
+
+        const reviewInsights: string[] = [];
+        if (totalCompleted > 0) reviewInsights.push(`Completed ${totalCompleted} goal${totalCompleted !== 1 ? 's' : ''} this week`);
+        if (familyEventsThisWeek.length > 0) reviewInsights.push(`Spent time on ${familyEventsThisWeek.length} family activit${familyEventsThisWeek.length !== 1 ? 'ies' : 'y'}`);
+        if (sleepRecords.length > 0) reviewInsights.push(`Logged ${sleepRecords.length} sleep record${sleepRecords.length !== 1 ? 's' : ''} with average quality ${Math.round(avgSleepQuality * 10) / 10}/10`);
+        if (reviewInsights.length === 0) reviewInsights.push('No activity data yet — start logging to see insights here');
+
+        const reviewCelebrations = completedThisWeek.slice(0, 3).map((g: any) => `Completed: ${g.title || g.name || 'Goal'}`);
+
+        const reviewWarnings = overdueGoals.slice(0, 3).map((g: any) => `Overdue: ${g.title || g.name || 'Goal'}`);
+
+        const reviewRecommendations: string[] = [];
+        if (workLifeBalance < 40) reviewRecommendations.push('Consider balancing work goals with personal time');
+        if (familyTimeHours < 2) reviewRecommendations.push('Try to schedule at least 2 hours of family time next week');
+        if (avgSleepQuality < 6) reviewRecommendations.push('Focus on improving sleep quality with a consistent routine');
+        if (reviewRecommendations.length === 0) reviewRecommendations.push('Keep up the great work and maintain your current balance');
+
+        setWeeklyReview({
+          id: 'review_computed',
+          userId: uid,
+          weekStart,
+          weekEnd: now,
+          workLifeBalance,
+          familyTime: Math.round(familyTimeHours * 10) / 10,
+          personalTime: Math.round(personalTimeHours * 10) / 10,
+          restQuality: Math.round(avgSleepQuality * 10) / 10,
+          insights: reviewInsights,
+          recommendations: reviewRecommendations,
+          celebrations: reviewCelebrations,
+          warnings: reviewWarnings,
+          createdAt: now,
+        });
+
+        // --- Compute burnout prediction ---
+        const incompleteHighPriority = goals.filter((g: any) => !g.completedAt && g.priority === 'high').length;
+
+        const recentEnergyLogs = energyLogs.filter((e: any) => {
+          const date = e.date?.toDate ? e.date.toDate() : new Date(e.date);
+          return date >= sevenDaysAgo;
+        });
+        const avgEnergy = recentEnergyLogs.length > 0
+          ? recentEnergyLogs.reduce((sum: number, e: any) => sum + (e.level || e.energy || 5), 0) / recentEnergyLogs.length
+          : null;
+
+        const optimalSleepMinutes = 8 * 60;
+        const sleepDebtHours = sleepRecords.length > 0
+          ? sleepRecords.reduce((debt: number, r: any) => debt + Math.max(0, optimalSleepMinutes - (r.duration || 0)), 0) / 60
+          : 0;
+
+        let riskScore = 0;
+        const burnoutFactors: string[] = [];
+        const burnoutRecommendations: string[] = [];
+
+        if (incompleteHighPriority > 5) {
+          riskScore += 2;
+          burnoutFactors.push(`${incompleteHighPriority} incomplete high-priority goals`);
+          burnoutRecommendations.push('Prioritize and delegate some high-priority goals');
+        }
+        if (avgEnergy !== null && avgEnergy < 5) {
+          riskScore += 2;
+          burnoutFactors.push(`Average energy level is low (${Math.round(avgEnergy * 10) / 10}/10)`);
+          burnoutRecommendations.push('Schedule more recovery time and reduce workload');
+        }
+        if (sleepDebtHours > 5) {
+          riskScore += 2;
+          burnoutFactors.push(`Sleep debt of ${Math.round(sleepDebtHours * 10) / 10} hours accumulated`);
+          burnoutRecommendations.push('Prioritize catching up on sleep this week');
+        }
+        if (overdueGoals.length > 3) {
+          riskScore += 1;
+          burnoutFactors.push(`${overdueGoals.length} overdue goals creating stress`);
+          burnoutRecommendations.push('Review and reschedule overdue goals to reduce pressure');
+        }
+
+        if (burnoutFactors.length === 0) burnoutFactors.push('No significant risk factors detected');
+        if (burnoutRecommendations.length === 0) burnoutRecommendations.push('Maintain your current healthy work-life balance');
+
+        let riskLevel: BurnoutPrediction['riskLevel'] = 'low';
+        let timeToBurnout = 90;
+        let confidence = 0.6;
+
+        if (riskScore >= 6) {
+          riskLevel = 'critical';
+          timeToBurnout = 7;
+          confidence = 0.85;
+        } else if (riskScore >= 4) {
+          riskLevel = 'high';
+          timeToBurnout = 14;
+          confidence = 0.8;
+        } else if (riskScore >= 2) {
+          riskLevel = 'medium';
+          timeToBurnout = 30;
+          confidence = 0.7;
+        }
+
+        setBurnoutPrediction({
+          userId: uid,
+          riskLevel,
+          confidence,
+          factors: burnoutFactors,
+          recommendations: burnoutRecommendations,
+          timeToBurnout,
+          predictedAt: now,
+        });
+      } catch (err) {
+        console.error('Error loading AI advisory data from Firestore:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAndComputeInsights();
   }, [user]);
 
   const dismissAdvice = (id: string) => {
-    if (!user) return;
-    const updated = advice.map(a => a.id === id ? { ...a, dismissed: true } : a);
-    setAdvice(updated);
-    localStorage.setItem(`life_advice_${user.uid}`, JSON.stringify(updated));
+    setAdvice(prev => prev.map(a => a.id === id ? { ...a, dismissed: true } : a));
   };
 
   const getCategoryIcon = (category: LifeAdvice['category']) => {

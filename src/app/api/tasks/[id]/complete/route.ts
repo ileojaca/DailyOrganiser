@@ -120,6 +120,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       lastStreakDate: today,
     });
 
+    // Send achievement email if any were unlocked
+    if (newAchievements.length > 0) {
+      try {
+        const { getAdminAuth } = await import('@/lib/firebaseAdmin');
+        const userRecord = await getAdminAuth().getUser(userId);
+        if (userRecord.email) {
+          const achievementNames = newAchievements.map((a: { name: string }) => a.name).join(', ');
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications/email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-internal-call': 'true' },
+            body: JSON.stringify({
+              to: userRecord.email,
+              subject: `Achievement Unlocked: ${achievementNames}`,
+              body: `Congratulations! You just unlocked: ${achievementNames}. Keep up the great work!`,
+              type: 'task_reminder',
+              userId,
+            }),
+          });
+        }
+      } catch (e) {
+        console.error('Failed to send achievement email:', e);
+      }
+    }
+
     return NextResponse.json(
       {
         task: completedTask,

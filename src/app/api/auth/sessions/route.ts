@@ -1,25 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { verifyAuthToken, getAdminDb } from '@/lib/firebaseAdmin';
 
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all sessions for the user
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('user_sessions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('last_active', { ascending: false });
+    // Get all sessions for the user from Firestore
+    const adminDb = getAdminDb();
+    const snapshot = await adminDb
+      .collection('users')
+      .doc(uid)
+      .collection('sessions')
+      .orderBy('lastActive', 'desc')
+      .get()
+      .catch(() => null);
 
-    if (sessionsError) {
-      console.error('Error fetching sessions:', sessionsError);
-      return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
+    // Gracefully return empty array if collection doesn't exist yet
+    if (!snapshot) {
+      return NextResponse.json({ sessions: [] });
     }
+
+    const sessions = snapshot.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      lastActive: d.data().lastActive?.toDate?.()?.toISOString?.() || d.data().lastActive,
+      createdAt: d.data().createdAt?.toDate?.()?.toISOString?.() || d.data().createdAt,
+    }));
 
     return NextResponse.json({ sessions });
   } catch (error) {
@@ -30,9 +39,8 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -40,49 +48,24 @@ export async function DELETE(request: NextRequest) {
     const sessionId = searchParams.get('sessionId');
     const logoutAll = searchParams.get('logoutAll') === 'true';
 
+    const adminDb = getAdminDb();
+    const sessionsRef = adminDb.collection('users').doc(uid).collection('sessions');
+
     if (logoutAll) {
-      // Logout from all devices except current session
       const currentSessionId = searchParams.get('currentSessionId');
-      
-      if (currentSessionId) {
-        // Delete all sessions except current
-        const { error: deleteError } = await supabase
-          .from('user_sessions')
-          .delete()
-          .eq('user_id', user.id)
-          .neq('id', currentSessionId);
+      const snapshot = await sessionsRef.get();
 
-        if (deleteError) {
-          console.error('Error deleting sessions:', deleteError);
-          return NextResponse.json({ error: 'Failed to logout from other devices' }, { status: 500 });
-        }
-      } else {
-        // Delete all sessions
-        const { error: deleteError } = await supabase
-          .from('user_sessions')
-          .delete()
-          .eq('user_id', user.id);
-
-        if (deleteError) {
-          console.error('Error deleting sessions:', deleteError);
-          return NextResponse.json({ error: 'Failed to logout from all devices' }, { status: 500 });
+      const batch = adminDb.batch();
+      for (const doc of snapshot.docs) {
+        if (!currentSessionId || doc.id !== currentSessionId) {
+          batch.delete(doc.ref);
         }
       }
+      await batch.commit();
 
       return NextResponse.json({ success: true, message: 'Logged out from all devices' });
     } else if (sessionId) {
-      // Logout from specific session
-      const { error: deleteError } = await supabase
-        .from('user_sessions')
-        .delete()
-        .eq('id', sessionId)
-        .eq('user_id', user.id);
-
-      if (deleteError) {
-        console.error('Error deleting session:', deleteError);
-        return NextResponse.json({ error: 'Failed to logout from device' }, { status: 500 });
-      }
-
+      await sessionsRef.doc(sessionId).delete();
       return NextResponse.json({ success: true, message: 'Logged out from device' });
     } else {
       return NextResponse.json({ error: 'Session ID or logoutAll parameter required' }, { status: 400 });
