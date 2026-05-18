@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseTaskInput, generateConfirmation } from '@/utils/voiceTaskParser';
 import { createTask } from '@/lib/firebaseUtils';
-import Anthropic from '@anthropic-ai/sdk';
+import { callAI, type AIProvider } from '@/lib/aiClient';
 
-async function parseWithClaude(input: string, userId: string) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-
-  const client = new Anthropic({ apiKey });
-  const msg = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 300,
-    messages: [{
-      role: 'user',
-      content: `Parse this task description into structured data. Return ONLY valid JSON, no explanation.
+async function parseWithAI(input: string, provider?: AIProvider, model?: string) {
+  const prompt = `Parse this task description into structured data. Return ONLY valid JSON, no explanation.
 
 Input: "${input}"
 
@@ -26,12 +17,11 @@ Return JSON with these fields:
   "energyRequired": 1-10,
   "scheduledTime": "ISO datetime string or null",
   "confidence": 0.0-1.0
-}`
-    }],
-  });
+}`;
 
+  const text = await callAI({ provider, model, prompt, maxTokens: 300 });
+  if (!text) return null;
   try {
-    const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
     return JSON.parse(text);
   } catch {
     return null;
@@ -57,15 +47,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { input, text, createImmediate = false } = body;
+    const { input, text, createImmediate = false, aiProvider, aiModel } = body;
     const normalizedInput = typeof input === 'string' ? input : typeof text === 'string' ? text : '';
 
     if (!normalizedInput.trim()) {
       return NextResponse.json({ error: 'Input text is required' }, { status: 400 });
     }
 
-    // Parse the input — try Claude first, fall back to regex
-    let parsed = await parseWithClaude(normalizedInput, userId);
+    // Parse the input — try AI first, fall back to regex
+    let parsed = await parseWithAI(normalizedInput, aiProvider, aiModel);
     if (!parsed) {
       parsed = parseTaskInput(normalizedInput);
     }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken, getAdminDb } from '@/lib/firebaseAdmin';
+import { callAI, type AIProvider } from '@/lib/aiClient';
 import { predictTaskCompletion, findOptimalTimeSlots, generateWorkloadForecast, advancedWorkloadForecast, detectBurnoutRisk } from '@/utils/productivityPrediction';
 
 export async function GET(request: NextRequest) {
@@ -107,36 +108,27 @@ export async function GET(request: NextRequest) {
       }
 
       case 'ai-summary': {
-        const apiKey = process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-          insights = { summary: 'AI insights require ANTHROPIC_API_KEY to be configured.' };
-          break;
-        }
-
-        const Anthropic = (await import('@anthropic-ai/sdk')).default;
-        const client = new Anthropic({ apiKey });
+        const aiProvider = (searchParams.get('aiProvider') as AIProvider) || 'auto';
+        const aiModel = searchParams.get('aiModel') || undefined;
 
         const completedCount = logs.filter((l: any) => l.completion_status === 'completed').length;
         const totalCount = logs.length;
         const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-        const msg = await client.messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 400,
-          messages: [{
-            role: 'user',
-            content: `You are a productivity coach. Based on this user's data, provide 3 specific, actionable insights in JSON format.
+        const prompt = `You are a productivity coach. Based on this user's data, provide 3 specific, actionable insights in JSON format.
 
 User stats (last ${days} days):
 - Tasks completed: ${completedCount} of ${totalCount} (${completionRate}%)
 - Categories: ${[...new Set(logs.map((l: any) => l.category))].join(', ') || 'none'}
 
-Return JSON: { "insights": [{ "title": "string", "insight": "string", "action": "string" }] }`
-          }],
-        });
+Return JSON: { "insights": [{ "title": "string", "insight": "string", "action": "string" }] }`;
 
+        const text = await callAI({ provider: aiProvider, model: aiModel, prompt, maxTokens: 400 });
+        if (!text) {
+          insights = { summary: 'AI insights unavailable. Configure ANTHROPIC_API_KEY or OPENROUTER_API_KEY.' };
+          break;
+        }
         try {
-          const text = msg.content[0].type === 'text' ? msg.content[0].text : '{}';
           insights = JSON.parse(text);
         } catch {
           insights = { insights: [] };
