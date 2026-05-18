@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { verifyAuthToken, getAdminDb } from '@/lib/firebaseAdmin';
+import { Resend } from 'resend';
 
 interface EmailNotification {
   to: string;
@@ -10,9 +11,8 @@ interface EmailNotification {
 
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -24,52 +24,44 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has email notifications enabled
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('preferences')
-      .eq('user_id', user.id)
-      .single();
-
-    const preferences = profile?.preferences as Record<string, unknown> | null;
+    const adminDb = getAdminDb();
+    const profileDoc = await adminDb.collection('users').doc(uid).get();
+    const preferences = profileDoc.data()?.preferences;
     if (preferences?.emailNotifications === false) {
       return NextResponse.json({ message: 'Email notifications disabled' }, { status: 200 });
     }
 
-    // In a real implementation, you would integrate with an email service like:
-    // - SendGrid
-    // - Mailgun
-    // - AWS SES
-    // - Resend
-
-    // For now, we'll log the email and store it in the database
-    const { data: emailLog, error: logError } = await supabase
-      .from('email_logs')
-      .insert({
-        user_id: user.id,
-        recipient: to,
+    // Send email via Resend if API key is configured
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (resendApiKey) {
+      const resend = new Resend(resendApiKey);
+      await resend.emails.send({
+        from: process.env.EMAIL_FROM || 'DailyOrganiser <notifications@dailyorganiser.app>',
+        to,
         subject,
-        body: emailBody,
-        type,
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (logError) {
-      console.error('Error logging email:', logError);
-      return NextResponse.json({ error: 'Failed to log email' }, { status: 500 });
+        text: emailBody,
+      });
+    } else {
+      // Log to console if no API key configured
+      console.log(`[EMAIL] Sending to: ${to}`);
+      console.log(`[EMAIL] Subject: ${subject}`);
+      console.log(`[EMAIL] Type: ${type}`);
     }
 
-    // Simulate email sending (in production, replace with actual email service)
-    console.log(`[EMAIL] Sending to: ${to}`);
-    console.log(`[EMAIL] Subject: ${subject}`);
-    console.log(`[EMAIL] Type: ${type}`);
+    // Log email to Firestore
+    const emailLogRef = await adminDb.collection('users').doc(uid).collection('emailLogs').add({
+      recipient: to,
+      subject,
+      body: emailBody,
+      type,
+      status: resendApiKey ? 'sent' : 'logged',
+      sentAt: new Date(),
+    });
 
     return NextResponse.json({
       success: true,
       message: 'Email notification sent',
-      emailId: emailLog.id,
+      emailId: emailLogRef.id,
     });
   } catch (error) {
     console.error('Error sending email notification:', error);
@@ -79,27 +71,28 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
 
-    const { data: emails, error } = await supabase
-      .from('email_logs')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('sent_at', { ascending: false })
-      .range(offset, offset + limit - 1);
+    const adminDb = getAdminDb();
+    const snapshot = await adminDb
+      .collection('users')
+      .doc(uid)
+      .collection('emailLogs')
+      .orderBy('sentAt', 'desc')
+      .limit(limit)
+      .get();
 
-    if (error) {
-      console.error('Error fetching email logs:', error);
-      return NextResponse.json({ error: 'Failed to fetch email logs' }, { status: 500 });
-    }
+    const emails = snapshot.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      sentAt: d.data().sentAt?.toDate?.()?.toISOString?.() || d.data().sentAt,
+    }));
 
     return NextResponse.json({ emails });
   } catch (error) {

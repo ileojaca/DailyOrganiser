@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { LifeAdvice, WeeklyLifeReview, BurnoutPrediction } from '@/types/lifeManagement';
+import { getDb } from '@/lib/firebase';
+import { collection, getDocs, getDoc, doc, query, orderBy, limit } from 'firebase/firestore';
 
 export default function AIAdvisory() {
   const { user } = useAuth();

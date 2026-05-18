@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FamilyMember, FamilyEvent, ConnectionPrompt } from '@/types/lifeManagement';
+import { getDb } from '@/lib/firebase';
+import { collection, getDocs, addDoc } from 'firebase/firestore';
 
 export default function FamilyHub() {
   const { user } = useAuth();
@@ -24,16 +26,47 @@ export default function FamilyHub() {
   useEffect(() => {
     if (!user) return;
 
-    // Load from localStorage
-    const savedMembers = localStorage.getItem(`family_members_${user.uid}`);
-    const savedEvents = localStorage.getItem(`family_events_${user.uid}`);
-    
-    if (savedMembers) setFamilyMembers(JSON.parse(savedMembers));
-    if (savedEvents) setEvents(JSON.parse(savedEvents));
+    const loadFamilyData = async () => {
+      try {
+        const db = getDb();
 
-    // Generate connection prompts
-    generateConnectionPrompts();
-    setLoading(false);
+        const [membersSnap, eventsSnap] = await Promise.all([
+          getDocs(collection(db, 'users', user.uid, 'familyMembers')),
+          getDocs(collection(db, 'users', user.uid, 'familyEvents')),
+        ]);
+
+        const loadedMembers: FamilyMember[] = membersSnap.docs.map(docSnap => {
+          const data = docSnap.data();
+          return {
+            ...data,
+            id: docSnap.id,
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
+          } as FamilyMember;
+        });
+
+        const loadedEvents: FamilyEvent[] = eventsSnap.docs.map(docSnap => {
+          const data = docSnap.data();
+          return {
+            ...data,
+            id: docSnap.id,
+            startTime: data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime),
+            endTime: data.endTime?.toDate ? data.endTime.toDate() : new Date(data.endTime),
+            createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt),
+            updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt),
+          } as FamilyEvent;
+        });
+
+        setFamilyMembers(loadedMembers);
+        setEvents(loadedEvents);
+      } catch (err) {
+        console.error('Error loading family data from Firestore:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFamilyData();
   }, [user]);
 
   const generateConnectionPrompts = () => {
@@ -62,11 +95,10 @@ export default function FamilyHub() {
     setConnectionPrompts(prompts);
   };
 
-  const addFamilyMember = () => {
+  const addFamilyMember = async () => {
     if (!user || !newMember.name) return;
 
-    const member: FamilyMember = {
-      id: `member_${Date.now()}`,
+    const memberData = {
       userId: user.uid,
       name: newMember.name,
       relationship: newMember.relationship,
@@ -75,19 +107,27 @@ export default function FamilyHub() {
       updatedAt: new Date(),
     };
 
-    const updated = [...familyMembers, member];
-    setFamilyMembers(updated);
-    localStorage.setItem(`family_members_${user.uid}`, JSON.stringify(updated));
+    try {
+      const db = getDb();
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'familyMembers'), memberData);
+      const member: FamilyMember = { ...memberData, id: docRef.id };
+      setFamilyMembers(prev => {
+        const updated = [...prev, member];
+        return updated;
+      });
+    } catch (err) {
+      console.error('Error adding family member to Firestore:', err);
+    }
+
     setNewMember({ name: '', relationship: 'spouse' });
     setShowAddMember(false);
     generateConnectionPrompts();
   };
 
-  const addFamilyEvent = () => {
+  const addFamilyEvent = async () => {
     if (!user || !newEvent.title || !newEvent.startTime) return;
 
-    const event: FamilyEvent = {
-      id: `event_${Date.now()}`,
+    const eventData = {
       title: newEvent.title,
       type: newEvent.type,
       startTime: new Date(newEvent.startTime),
@@ -98,9 +138,15 @@ export default function FamilyHub() {
       updatedAt: new Date(),
     };
 
-    const updated = [...events, event];
-    setEvents(updated);
-    localStorage.setItem(`family_events_${user.uid}`, JSON.stringify(updated));
+    try {
+      const db = getDb();
+      const docRef = await addDoc(collection(db, 'users', user.uid, 'familyEvents'), eventData);
+      const event: FamilyEvent = { ...eventData, id: docRef.id };
+      setEvents(prev => [...prev, event]);
+    } catch (err) {
+      console.error('Error adding family event to Firestore:', err);
+    }
+
     setNewEvent({ title: '', type: 'meal', startTime: '', endTime: '', participants: [] });
     setShowAddEvent(false);
   };

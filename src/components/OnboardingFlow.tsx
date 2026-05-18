@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { OnboardingStep, OnboardingProgress } from '@/types/lifeManagement';
+import { getDb } from '@/lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 interface OnboardingFlowProps {
   onComplete: () => void;
@@ -83,29 +85,44 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
   useEffect(() => {
     if (!user) return;
 
-    // Check if onboarding is already completed
-    const saved = localStorage.getItem(`onboarding_${user.uid}`);
-    if (saved) {
-      const savedProgress = JSON.parse(saved);
-      if (savedProgress.completedAt) {
-        onComplete();
-        return;
+    const loadOnboarding = async () => {
+      // Check localStorage first for instant UX
+      const saved = localStorage.getItem(`onboarding_${user.uid}`);
+      if (saved) {
+        const savedProgress = JSON.parse(saved);
+        if (savedProgress.completedAt) {
+          onComplete();
+          return;
+        }
+        setProgress(savedProgress);
+        setCurrentStep(savedProgress.currentStep);
+      } else {
+        const newProgress: OnboardingProgress = {
+          userId: user.uid,
+          currentStep: 0,
+          completedSteps: [],
+          startedAt: new Date(),
+        };
+        setProgress(newProgress);
+        localStorage.setItem(`onboarding_${user.uid}`, JSON.stringify(newProgress));
       }
-      setProgress(savedProgress);
-      setCurrentStep(savedProgress.currentStep);
-    } else {
-      const newProgress: OnboardingProgress = {
-        userId: user.uid,
-        currentStep: 0,
-        completedSteps: [],
-        startedAt: new Date(),
-      };
-      setProgress(newProgress);
-      localStorage.setItem(`onboarding_${user.uid}`, JSON.stringify(newProgress));
-    }
+
+      // Also check Firestore for authoritative completion status
+      try {
+        const db = getDb();
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && userDoc.data()?.onboardingCompleted === true) {
+          onComplete();
+        }
+      } catch (err) {
+        console.error('Error checking Firestore onboarding status:', err);
+      }
+    };
+
+    loadOnboarding();
   }, [user, onComplete]);
 
-  const nextStep = () => {
+  const nextStep = async () => {
     if (!progress || !user) return;
 
     const updatedProgress: OnboardingProgress = {
@@ -117,11 +134,43 @@ export default function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
     if (currentStep + 1 >= steps.length) {
       updatedProgress.completedAt = new Date();
       localStorage.setItem(`onboarding_${user.uid}`, JSON.stringify(updatedProgress));
+
+      // Write completion to Firestore
+      try {
+        const db = getDb();
+        await setDoc(
+          doc(db, 'users', user.uid),
+          {
+            onboardingCompleted: true,
+            chronotype: answers.chronotype,
+            priorities: answers.priorities,
+            familyPlan: answers.familyPlan,
+            worklifeBalance: answers.worklifeBalance,
+            onboardingCompletedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      } catch (err) {
+        console.error('Error writing onboarding completion to Firestore:', err);
+      }
+
       onComplete();
     } else {
       setProgress(updatedProgress);
       setCurrentStep(currentStep + 1);
       localStorage.setItem(`onboarding_${user.uid}`, JSON.stringify(updatedProgress));
+
+      // Save progress to Firestore
+      try {
+        const db = getDb();
+        await setDoc(
+          doc(db, 'users', user.uid),
+          { answers, currentStep: currentStep + 1 },
+          { merge: true }
+        );
+      } catch (err) {
+        console.error('Error saving onboarding progress to Firestore:', err);
+      }
     }
   };
 
