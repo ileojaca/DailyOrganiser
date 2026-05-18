@@ -12,11 +12,13 @@ import TodayTimeline from '@/components/TodayTimeline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useGamification } from '@/hooks/useGamification';
 
 export default function Home() {
   const { profile, user } = useAuth();
   const { goals, createGoal } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
+  const { progress: gamificationProgress } = useGamification();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [alertsFired, setAlertsFired] = useState(false);
   const [quickTask, setQuickTask] = useState('');
@@ -361,6 +363,47 @@ export default function Home() {
 
           {/* Right — assistant shortcuts + energy ── */}
           <div className="space-y-6">
+
+            {/* Gamification widget */}
+            {gamificationProgress && (() => {
+              const lvl = gamificationProgress.level ?? 1;
+              const pts = gamificationProgress.totalPoints ?? 0;
+              const streak = gamificationProgress.currentStreak ?? 0;
+              const pointsForCurrentLevel = (lvl - 1) * 500;
+              const pointsForNextLevel = lvl * 500;
+              const xpPercent = Math.min(100, Math.max(0,
+                ((pts - pointsForCurrentLevel) / (pointsForNextLevel - pointsForCurrentLevel)) * 100
+              ));
+              return (
+                <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Progress</h3>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400">
+                      Level {lvl}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1">
+                      <span className="text-lg">🔥</span>
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">{streak}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">day streak</span>
+                    </div>
+                    <span className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
+                      {pts.toLocaleString()} pts
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-500 rounded-full transition-all"
+                      style={{ width: `${xpPercent}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    {(pointsForNextLevel - pts).toLocaleString()} pts to Level {lvl + 1}
+                  </p>
+                </div>
+              );
+            })()}
 
             {/* Quick navigation cards */}
             <div className="grid grid-cols-2 gap-3">

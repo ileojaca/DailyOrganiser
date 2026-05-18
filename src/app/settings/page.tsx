@@ -34,6 +34,14 @@ export default function SettingsPage() {
     preferences: { notifications: true, reminders: true, suggestionAlerts: true },
   });
 
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    morningBriefingTime: '08:00',
+    eveningReviewTime: '19:00',
+    reminderLeadTime: '30 minutes before',
+    pushNotifications: true,
+    emailNotifications: false,
+  });
+
   useEffect(() => {
     if (profile) {
       const p = profile as any;
@@ -46,6 +54,15 @@ export default function SettingsPage() {
         energyPattern: profile.energyPattern || { peakHours: ['09:00-11:00', '15:00-17:00'], lowHours: ['13:00-14:00'] },
         preferences: profile.preferences || { notifications: true, reminders: true, suggestionAlerts: true },
       });
+      if (p.notificationPrefs) {
+        setNotificationPrefs({
+          morningBriefingTime: p.notificationPrefs.morningBriefingTime || '08:00',
+          eveningReviewTime: p.notificationPrefs.eveningReviewTime || '19:00',
+          reminderLeadTime: p.notificationPrefs.reminderLeadTime || '30 minutes before',
+          pushNotifications: p.notificationPrefs.pushNotifications ?? true,
+          emailNotifications: p.notificationPrefs.emailNotifications ?? false,
+        });
+      }
     }
   }, [profile]);
 
@@ -66,7 +83,7 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      await updateProfile(formData);
+      await updateProfile({ ...formData, notificationPrefs } as any);
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' });
