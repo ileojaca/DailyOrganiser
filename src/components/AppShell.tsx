@@ -110,7 +110,7 @@ const BOTTOM_NAV = [
   )},
   { href: '#more', label: 'More', icon: (
     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
     </svg>
   )},
 ];
@@ -239,8 +239,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Mobile bottom tab bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 safe-area-bottom">
-        <div className="flex items-center justify-around px-1 pt-2 pb-3">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="flex items-center justify-around px-1 pt-2 pb-2">
           {BOTTOM_NAV.map((item) => {
             const isMore = item.href === '#more';
             const active = !isMore && pathname === item.href;
@@ -254,7 +254,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     router.push(item.href);
                   }
                 }}
-                className="flex flex-col items-center gap-1 min-w-[60px] transition-colors"
+                className="flex flex-col items-center gap-0.5 min-w-[56px] py-1 transition-colors"
                 style={active ? { color: 'var(--accent-color)' } : {}}
               >
                 <span className={active ? '' : 'text-gray-400 dark:text-gray-500'}>
@@ -279,11 +279,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           onClick={() => setMoreOpen(false)}
         >
           <div
-            className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-950 rounded-t-2xl safe-area-bottom overflow-hidden"
+            className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-950 rounded-t-2xl overflow-hidden"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-10 h-1 bg-gray-200 dark:bg-gray-700 rounded-full mx-auto mt-3 mb-4" />
-            <div className="px-4 pb-2">
+            <div className="px-4 pb-4">
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">More</p>
               <div className="space-y-1">
                 {allMoreItems.map((item) => {
@@ -306,10 +307,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   );
                 })}
               </div>
-              <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3 pb-2">
-                <div className="flex items-center gap-3 px-3 py-2 mb-2">
+              <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3">
+                <div className="flex items-center gap-3 px-3 py-2 mb-3">
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0"
+                    className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm text-white flex-shrink-0"
                     style={{ background: 'var(--accent-color)' }}
                   >
                     {initials}
@@ -343,7 +344,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
