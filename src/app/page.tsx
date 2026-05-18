@@ -4,12 +4,12 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
-import EnergyTracker from '@/components/EnergyTracker';
-import HabitStreaks from '@/components/HabitStreaks';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import LandingPage from '@/components/LandingPage';
-import TodayTimeline from '@/components/TodayTimeline';
 import OptimizedDaySchedule from '@/components/OptimizedDaySchedule';
+import TodayTimeline from '@/components/TodayTimeline';
+import HabitStreaks from '@/components/HabitStreaks';
+import EnergyTracker from '@/components/EnergyTracker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -45,12 +45,81 @@ function formatDeadline(deadline: Date): string {
   return `due in ${days}d`;
 }
 
+interface SmartMessageContext {
+  hour: number;
+  overdueTasks: { title: string }[];
+  dueTodayTasks: { title: string }[];
+  topTask: { title: string } | null;
+  avgEnergy: number;
+  completedToday: number;
+}
+
+function getSmartMessage(context: SmartMessageContext): { headline: string; detail: string; emoji: string; urgency: 'normal' | 'warning' | 'critical' } {
+  const { hour, overdueTasks, dueTodayTasks, topTask, completedToday } = context;
+
+  if (overdueTasks.length >= 3) return {
+    emoji: '🚨',
+    headline: `${overdueTasks.length} tasks are overdue`,
+    detail: `Start with "${overdueTasks[0]?.title}" right now — it's most overdue.`,
+    urgency: 'critical',
+  };
+
+  if (overdueTasks.length > 0) return {
+    emoji: '⚠️',
+    headline: `"${overdueTasks[0]?.title}" is overdue`,
+    detail: `Complete it before taking on new work today.`,
+    urgency: 'warning',
+  };
+
+  if (hour < 10 && topTask) return {
+    emoji: '🌅',
+    headline: `Morning focus: ${topTask.title}`,
+    detail: `Your energy is at its peak now. Tackle your top priority first.`,
+    urgency: 'normal',
+  };
+
+  if (hour >= 12 && hour < 14) return {
+    emoji: '🍽️',
+    headline: completedToday > 0 ? `${completedToday} done — enjoy lunch!` : 'Take a proper lunch break',
+    detail: "Rest now, you'll be more productive afterwards.",
+    urgency: 'normal',
+  };
+
+  if (hour >= 17 && dueTodayTasks.length > 0) return {
+    emoji: '⏰',
+    headline: `${dueTodayTasks.length} task${dueTodayTasks.length > 1 ? 's' : ''} still due today`,
+    detail: `Push to finish "${dueTodayTasks[0]?.title}" before you log off.`,
+    urgency: 'warning',
+  };
+
+  if (completedToday >= 5) return {
+    emoji: '🏆',
+    headline: `Outstanding! ${completedToday} tasks completed`,
+    detail: topTask ? `Consider tackling "${topTask.title}" too.` : "You're crushing it today!",
+    urgency: 'normal',
+  };
+
+  if (topTask) return {
+    emoji: '🎯',
+    headline: `Focus: ${topTask.title}`,
+    detail: `${dueTodayTasks.length} tasks due today. Start here.`,
+    urgency: 'normal',
+  };
+
+  return {
+    emoji: '✨',
+    headline: 'All clear — great job!',
+    detail: 'No urgent tasks. Add something new to keep momentum.',
+    urgency: 'normal',
+  };
+}
+
 export default function Home() {
   const { profile, user } = useAuth();
   const { goals, createGoal, updateGoal, completeGoal } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
   const { progress: gamificationProgress } = useGamification();
-  const { sleep, energy } = useSleepAndEnergy(user?.uid);
+  const { energy, sleep } = useSleepAndEnergy(user?.uid);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [alertsFired, setAlertsFired] = useState(false);
   const [quickTask, setQuickTask] = useState('');
@@ -59,13 +128,12 @@ export default function Home() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const name = profile?.fullName?.split(' ')[0] || 'there';
+  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const activeTasks = goals.filter(g => g.status === 'pending' || g.status === 'in_progress');
   const completedToday = goals.filter(g => {
@@ -90,13 +158,13 @@ export default function Home() {
     return false;
   });
 
+  const topPriorityTask = [...activeTasks].sort((a, b) => b.priority - a.priority)[0] ?? null;
+
   const scheduledToday = activeTasks.filter(g => {
     if (!g.scheduledStart) return false;
     const s = new Date(g.scheduledStart);
     return s >= today && s < tomorrow;
   });
-
-  const topPriorityTask = [...activeTasks].sort((a, b) => b.priority - a.priority)[0];
 
   const displayTasks = [...activeTasks]
     .sort((a, b) => b.priority - a.priority)
@@ -113,6 +181,15 @@ export default function Home() {
     const deviation = Math.abs(workCount / recent.length - 0.4);
     return Math.round(Math.max(0, 100 - deviation * 150));
   }, [goals]);
+
+  const smartMsg = getSmartMessage({
+    hour,
+    overdueTasks,
+    dueTodayTasks,
+    topTask: topPriorityTask,
+    avgEnergy: energy.currentLevel ?? 5,
+    completedToday: completedToday.length,
+  });
 
   useEffect(() => {
     if (!user || goals.length === 0 || alertsFired) return;
