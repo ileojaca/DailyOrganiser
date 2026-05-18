@@ -8,6 +8,7 @@ import EnergyTracker from '@/components/EnergyTracker';
 import HabitStreaks from '@/components/HabitStreaks';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import LandingPage from '@/components/LandingPage';
+import TodayTimeline from '@/components/TodayTimeline';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -57,6 +58,23 @@ export default function Home() {
     .filter(g => g.priority >= 4)
     .sort((a, b) => b.priority - a.priority)
     .slice(0, 5);
+
+  const scheduledToday = activeTasks.filter(g => {
+    if (!g.scheduledStart) return false;
+    const s = new Date(g.scheduledStart);
+    return s >= today && s < tomorrow;
+  });
+
+  const needsAttention = activeTasks.filter(g => {
+    if (overdueTasks.includes(g)) return true;
+    if (g.status === 'in_progress' && g.updatedAt) {
+      const daysSinceUpdate = (Date.now() - new Date(g.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+      return daysSinceUpdate > 2;
+    }
+    return false;
+  });
+
+  const topPriorityTask = [...activeTasks].sort((a, b) => b.priority - a.priority)[0];
 
   // Real work-life score (0-100)
   const workLifeScore = useMemo(() => {
@@ -178,6 +196,51 @@ export default function Home() {
           </div>
         )}
 
+        {/* ── Daily Briefing ── */}
+        <div className="mb-4 flex items-start gap-3 p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl">
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-indigo-500 dark:text-indigo-400 uppercase tracking-wide mb-0.5">
+              Daily Briefing · {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+            </p>
+            <p className="text-sm text-gray-800 dark:text-gray-200">
+              {overdueTasks.length > 0
+                ? `You have ${activeTasks.length} task${activeTasks.length !== 1 ? 's' : ''} today, ${overdueTasks.length} are overdue. Highest priority: ${topPriorityTask?.title ?? 'none'}.`
+                : topPriorityTask
+                  ? `No overdue tasks. Focus on "${topPriorityTask.title}".`
+                  : `All clear — no active tasks. Add something to get started.`
+              }
+            </p>
+          </div>
+        </div>
+
+        {/* ── Needs Attention ── */}
+        {needsAttention.length > 0 && (
+          <div className="mb-4 bg-white dark:bg-gray-800 border border-orange-200 dark:border-orange-800 rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-orange-100 dark:border-orange-900/50 bg-orange-50 dark:bg-orange-900/20">
+              <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                Needs Attention ({needsAttention.length})
+              </p>
+            </div>
+            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+              {needsAttention.map(task => (
+                <div key={task.id} className="flex items-center gap-3 px-4 py-3">
+                  <span className="text-lg">{categoryEmoji[task.category] || '📌'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{task.title}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{task.category}</p>
+                  </div>
+                  <Link
+                    href="/focus"
+                    className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Start now
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Real stats row ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
@@ -281,6 +344,9 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* Today's timeline */}
+            <TodayTimeline tasks={scheduledToday} />
 
             {/* Full task list */}
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm p-4">
