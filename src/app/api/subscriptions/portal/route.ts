@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
-import { supabase } from '@/lib/supabase';
+import { verifyAuthToken, getAdminDb } from '@/lib/firebaseAdmin';
 
 export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const uid = await verifyAuthToken(request);
+    if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
     const { returnUrl } = body;
@@ -18,19 +15,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's Stripe customer ID
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('stripe_customer_id')
-      .eq('user_id', user.id)
-      .single();
+    const db = getAdminDb();
+    const userDoc = await db.collection('users').doc(uid).get();
+    const customerId = userDoc.data()?.stripeCustomerId;
 
-    if (!profile?.stripe_customer_id) {
+    if (!customerId) {
       return NextResponse.json({ error: 'No subscription found' }, { status: 404 });
     }
 
     // Create billing portal session
     const session = await stripe.billingPortal.sessions.create({
-      customer: profile.stripe_customer_id,
+      customer: customerId,
       return_url: returnUrl,
     });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
-import { supabase } from '@/lib/supabase';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 import Stripe from 'stripe';
 
 export async function POST(request: NextRequest) {
@@ -74,24 +74,16 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  // Determine subscription tier from price ID
   const tier = getTierFromPriceId(priceId);
 
-  // Update user profile with subscription info
-  const { error } = await supabase
-    .from('user_profiles')
-    .update({
-      subscription_tier: tier,
-      stripe_customer_id: session.customer,
-      stripe_subscription_id: session.subscription,
-      subscription_status: 'active',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId);
-
-  if (error) {
-    console.error('Error updating user profile:', error);
-  }
+  const db = getAdminDb();
+  await db.collection('users').doc(userId).set({
+    subscriptionTier: tier,
+    stripeCustomerId: session.customer,
+    stripeSubscriptionId: session.subscription,
+    subscriptionStatus: 'active',
+    updatedAt: new Date(),
+  }, { merge: true });
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
@@ -99,130 +91,81 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const status = subscription.status;
   const priceId = subscription.items.data[0]?.price.id;
 
-  // Find user by Stripe customer ID
-  const { data: profile, error: fetchError } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
-
-  if (fetchError || !profile) {
-    console.error('Error finding user for customer:', customerId);
+  const db = getAdminDb();
+  const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+  if (usersSnap.empty) {
+    console.error('User not found for customer:', customerId);
     return;
   }
+  const uid = usersSnap.docs[0].id;
 
   const tier = getTierFromPriceId(priceId);
 
-  // Update subscription status
-  const { error } = await supabase
-    .from('user_profiles')
-    .update({
-      subscription_tier: tier,
-      subscription_status: status,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', profile.user_id);
-
-  if (error) {
-    console.error('Error updating subscription:', error);
-  }
+  await db.collection('users').doc(uid).set({
+    subscriptionTier: tier,
+    subscriptionStatus: status,
+    updatedAt: new Date(),
+  }, { merge: true });
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string;
 
-  // Find user by Stripe customer ID
-  const { data: profile, error: fetchError } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
-
-  if (fetchError || !profile) {
-    console.error('Error finding user for customer:', customerId);
+  const db = getAdminDb();
+  const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+  if (usersSnap.empty) {
+    console.error('User not found for customer:', customerId);
     return;
   }
+  const uid = usersSnap.docs[0].id;
 
-  // Downgrade to free tier
-  const { error } = await supabase
-    .from('user_profiles')
-    .update({
-      subscription_tier: 'free',
-      subscription_status: 'canceled',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', profile.user_id);
-
-  if (error) {
-    console.error('Error canceling subscription:', error);
-  }
+  await db.collection('users').doc(uid).set({
+    subscriptionTier: 'free',
+    subscriptionStatus: 'canceled',
+    updatedAt: new Date(),
+  }, { merge: true });
 }
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
 
-  // Find user by Stripe customer ID
-  const { data: profile, error: fetchError } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
-
-  if (fetchError || !profile) {
-    console.error('Error finding user for customer:', customerId);
+  const db = getAdminDb();
+  const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+  if (usersSnap.empty) {
+    console.error('User not found for customer:', customerId);
     return;
   }
+  const uid = usersSnap.docs[0].id;
 
-  // Log successful payment
-  const { error } = await supabase
-    .from('payment_logs')
-    .insert({
-      user_id: profile.user_id,
-      stripe_invoice_id: invoice.id,
-      amount: invoice.amount_paid,
-      currency: invoice.currency,
-      status: 'succeeded',
-      created_at: new Date().toISOString(),
-    });
-
-  if (error) {
-    console.error('Error logging payment:', error);
-  }
+  await db.collection('users').doc(uid).collection('paymentLogs').add({
+    stripeInvoiceId: invoice.id,
+    amount: invoice.amount_paid,
+    currency: invoice.currency,
+    status: 'succeeded',
+    createdAt: new Date(),
+  });
 }
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string;
 
-  // Find user by Stripe customer ID
-  const { data: profile, error: fetchError } = await supabase
-    .from('user_profiles')
-    .select('user_id')
-    .eq('stripe_customer_id', customerId)
-    .single();
-
-  if (fetchError || !profile) {
-    console.error('Error finding user for customer:', customerId);
+  const db = getAdminDb();
+  const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+  if (usersSnap.empty) {
+    console.error('User not found for customer:', customerId);
     return;
   }
+  const uid = usersSnap.docs[0].id;
 
-  // Log failed payment
-  const { error } = await supabase
-    .from('payment_logs')
-    .insert({
-      user_id: profile.user_id,
-      stripe_invoice_id: invoice.id,
-      amount: invoice.amount_due,
-      currency: invoice.currency,
-      status: 'failed',
-      created_at: new Date().toISOString(),
-    });
+  await db.collection('users').doc(uid).collection('paymentLogs').add({
+    stripeInvoiceId: invoice.id,
+    amount: invoice.amount_due,
+    currency: invoice.currency,
+    status: 'failed',
+    createdAt: new Date(),
+  });
 
-  if (error) {
-    console.error('Error logging payment:', error);
-  }
-
-  // Optionally notify user of failed payment
-  console.log(`Payment failed for user ${profile.user_id}`);
+  console.log(`Payment failed for user ${uid}`);
 }
 
 function getTierFromPriceId(priceId: string): string {
