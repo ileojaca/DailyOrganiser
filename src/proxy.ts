@@ -90,7 +90,7 @@ function getRateLimitHeaders(identifier: string, config: RateLimitConfig): Recor
   };
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Apply security headers to all routes
