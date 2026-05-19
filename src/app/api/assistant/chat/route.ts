@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken, getAdminDb } from '@/lib/firebaseAdmin';
 import Anthropic from '@anthropic-ai/sdk';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 interface GoalData {
   id: string;
@@ -249,8 +249,8 @@ RULES:
             const taskEnd = new Date(currentTime.getTime() + duration * 60 * 1000);
             if (taskEnd > endTime) break;
             await db.collection('users').doc(uid).collection('goals').doc(task.id as string).update({
-              scheduledStart: currentTime,
-              scheduledEnd: taskEnd,
+              scheduledStart: Timestamp.fromDate(currentTime),
+              scheduledEnd: Timestamp.fromDate(taskEnd),
               updatedAt: FieldValue.serverTimestamp(),
             });
             currentTime = new Date(taskEnd.getTime() + 15 * 60 * 1000);
@@ -272,8 +272,8 @@ RULES:
           const start = new Date(input.scheduledStart as string);
           const end = new Date(start.getTime() + (input.durationMinutes as number) * 60 * 1000);
           await db.collection('users').doc(uid).collection('goals').doc(input.taskId as string).update({
-            scheduledStart: start,
-            scheduledEnd: end,
+            scheduledStart: Timestamp.fromDate(start),
+            scheduledEnd: Timestamp.fromDate(end),
             updatedAt: FieldValue.serverTimestamp(),
           });
           toolResults.push({ toolName: 'reschedule_task', result: `Task rescheduled to ${start.toLocaleTimeString()}` });
