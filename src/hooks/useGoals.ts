@@ -93,7 +93,7 @@ export function useGoals(userId: string | undefined) {
       (snapshot) => {
         const goalsData: Goal[] = snapshot.docs.map((doc) => {
           const data = doc.data()
-          return {
+          const goal = {
             id: doc.id,
             userId,
             title: data.title,
@@ -114,6 +114,17 @@ export function useGoals(userId: string | undefined) {
             updatedAt: data.updatedAt?.toDate(),
             completedAt: data.completedAt?.toDate()
           } as Goal
+          // Debug logging for scheduled tasks
+          if (goal.scheduledStart) {
+            console.debug('Goal loaded with scheduledStart:', {
+              title: goal.title,
+              scheduledStart: goal.scheduledStart,
+              scheduledStartType: typeof goal.scheduledStart,
+              isDate: goal.scheduledStart instanceof Date,
+              toISOString: goal.scheduledStart.toISOString?.(),
+            })
+          }
+          return goal
         })
         setGoals(goalsData)
         setLoading(false)

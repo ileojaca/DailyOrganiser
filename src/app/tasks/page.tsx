@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import AppShell from '@/components/AppShell';
+import CreateGoalModal from '@/components/CreateGoalModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -39,9 +40,29 @@ function formatDeadline(deadline: Date): string {
 type FilterType = 'all' | 'in_progress' | 'completed';
 type SortType = 'priority' | 'due' | 'created';
 
+type GoalStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'deferred';
+
+const STATUS_CYCLE: Record<string, GoalStatus> = {
+  pending: 'in_progress',
+  in_progress: 'completed',
+  completed: 'pending',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'To Do',
+  in_progress: 'In Progress',
+  completed: 'Done',
+};
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+  in_progress: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  completed: 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+};
+
 export default function TasksPage() {
   const { user } = useAuth();
-  const { goals, createGoal, updateGoal, completeGoal } = useGoals(user?.uid);
+  const { goals, createGoal, updateGoal, completeGoal, loading: goalsLoading } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('priority');
@@ -49,6 +70,7 @@ export default function TasksPage() {
   const [quickCategory, setQuickCategory] = useState<'work' | 'personal' | 'health' | 'learning' | 'social' | 'family'>('personal');
   const [quickPriority, setQuickPriority] = useState(3);
   const [addingTask, setAddingTask] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const filteredTasks = goals.filter(g => {
     if (filter === 'all') return g.status === 'pending' || g.status === 'in_progress';
@@ -87,11 +109,12 @@ export default function TasksPage() {
     }
   };
 
-  const handleTaskCircleClick = async (task: typeof goals[0]) => {
-    if (task.status === 'pending') {
-      await updateGoal(task.id, { status: 'in_progress' });
-    } else if (task.status === 'in_progress') {
+  const handleStatusCycle = async (task: typeof goals[0]) => {
+    const next = STATUS_CYCLE[task.status] || 'pending';
+    if (next === 'completed') {
       await completeGoal(task.id);
+    } else {
+      await updateGoal(task.id, { status: next });
     }
   };
 
@@ -176,25 +199,11 @@ export default function TasksPage() {
             {sortedTasks.map((task, idx) => (
               <div
                 key={task.id}
-                className={`flex items-center gap-3 px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                className={`flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                   idx < sortedTasks.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''
                 }`}
               >
-                <div className={`w-1 h-12 rounded-full flex-shrink-0 ${priorityBarColor(task.priority)}`} />
-                <button
-                  onClick={() => handleTaskCircleClick(task)}
-                  className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-accent flex-shrink-0 flex items-center justify-center transition-colors"
-                  style={{ borderColor: task.status === 'in_progress' ? 'var(--accent-color)' : undefined }}
-                >
-                  {task.status === 'in_progress' && (
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--accent-color)' }} />
-                  )}
-                  {task.status === 'completed' && (
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </button>
+                <div className={`w-1 h-10 rounded-full flex-shrink-0 ${priorityBarColor(task.priority)}`} />
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-medium truncate ${task.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>
                     {task.title}
@@ -209,76 +218,110 @@ export default function TasksPage() {
                     )}
                   </div>
                 </div>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${priorityBadge(task.priority)}`}>
-                  {PRIORITY_LABEL[task.priority] || 'Medium'}
-                </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${priorityBadge(task.priority)}`}>
+                    {PRIORITY_LABEL[task.priority] || 'Medium'}
+                  </span>
+                  <button
+                    onClick={() => handleStatusCycle(task)}
+                    title={`Click to change: ${STATUS_LABEL[task.status]} → ${STATUS_LABEL[STATUS_CYCLE[task.status] || 'pending']}`}
+                    className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:opacity-80 ${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}
+                  >
+                    {STATUS_LABEL[task.status] || 'To Do'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add a new task</h2>
-          <form onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }} className="space-y-4">
-            <div>
-              <input
-                type="text"
-                value={quickTask}
-                onChange={(e) => setQuickTask(e.target.value)}
-                placeholder="What's your next task?"
-                className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent shadow-sm"
-                style={{ '--tw-ring-color': 'color-mix(in srgb, var(--accent-color) 30%, transparent)' } as React.CSSProperties}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Quick add form */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick add</h2>
+            <form onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }} className="space-y-4">
               <div>
-                <label htmlFor="category" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-                <select
-                  id="category"
-                  value={quickCategory}
-                  onChange={(e) => setQuickCategory(e.target.value as typeof quickCategory)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
-                >
-                  <option value="work">Work</option>
-                  <option value="personal">Personal</option>
-                  <option value="health">Health</option>
-                  <option value="learning">Learning</option>
-                  <option value="social">Social</option>
-                  <option value="family">Family</option>
-                </select>
+                <input
+                  type="text"
+                  value={quickTask}
+                  onChange={(e) => setQuickTask(e.target.value)}
+                  placeholder="What's your next task?"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent shadow-sm"
+                  style={{ '--tw-ring-color': 'color-mix(in srgb, var(--accent-color) 30%, transparent)' } as React.CSSProperties}
+                />
               </div>
 
-              <div>
-                <label htmlFor="priority" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
-                <select
-                  id="priority"
-                  value={quickPriority}
-                  onChange={(e) => setQuickPriority(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
-                >
-                  <option value="1">Low</option>
-                  <option value="2">Normal</option>
-                  <option value="3">Medium</option>
-                  <option value="4">High</option>
-                  <option value="5">Critical</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="category" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                  <select
+                    id="category"
+                    value={quickCategory}
+                    onChange={(e) => setQuickCategory(e.target.value as typeof quickCategory)}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                  >
+                    <option value="work">Work</option>
+                    <option value="personal">Personal</option>
+                    <option value="health">Health</option>
+                    <option value="learning">Learning</option>
+                    <option value="social">Social</option>
+                    <option value="family">Family</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="priority" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+                  <select
+                    id="priority"
+                    value={quickPriority}
+                    onChange={(e) => setQuickPriority(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                  >
+                    <option value="1">Low</option>
+                    <option value="2">Normal</option>
+                    <option value="3">Medium</option>
+                    <option value="4">High</option>
+                    <option value="5">Critical</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="col-span-2 sm:col-span-1">
-                <button
-                  type="submit"
-                  disabled={!quickTask.trim() || addingTask}
-                  className="w-full h-10 text-white font-semibold rounded-lg disabled:opacity-40 transition-opacity"
-                  style={{ background: 'var(--accent-color)' }}
-                >
-                  {addingTask ? 'Adding...' : 'Add Task'}
-                </button>
+              <button
+                type="submit"
+                disabled={!quickTask.trim() || addingTask}
+                className="w-full h-10 text-white font-semibold rounded-lg disabled:opacity-40 transition-opacity"
+                style={{ background: 'var(--accent-color)' }}
+              >
+                {addingTask ? 'Adding...' : 'Add Task'}
+              </button>
+            </form>
+          </div>
+
+          {/* Detailed add */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add with details</h2>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-600 dark:text-gray-400 hover:border-accent hover:text-accent hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-all flex items-center justify-center"
+              style={{ '--hover-color': 'var(--accent-color)' } as React.CSSProperties}
+            >
+              <div className="text-center">
+                <div className="text-3xl mb-2">+</div>
+                <p className="font-medium">Add goal with description</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Set duration, category, and add notes</p>
               </div>
-            </div>
-          </form>
+            </button>
+          </div>
         </div>
       </div>
+
+      <CreateGoalModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSuccess={() => {
+          addNotification({ type: 'success', title: 'Goal created', message: 'Your goal has been added.' });
+        }}
+      />
     </AppShell>
   );
 }

@@ -37,6 +37,7 @@ export default function AssistantPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [showNotifBanner, setShowNotifBanner] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -52,6 +53,61 @@ export default function AssistantPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  // Load chat history from Firestore
+  useEffect(() => {
+    if (!user) {
+      setLoadingHistory(false);
+      return;
+    }
+
+    const loadHistory = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/chat-history?date=${today}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const savedMessages = data.messages || [];
+
+          if (savedMessages.length > 0) {
+            const formattedMessages: Message[] = savedMessages.map((msg: any, idx: number) => ({
+              id: `${idx}`,
+              role: msg.role,
+              content: msg.content,
+              toolResults: msg.toolResults,
+              timestamp: new Date(msg.timestamp || new Date()),
+            }));
+
+            setMessages(formattedMessages);
+
+            // Rebuild conversation history from saved messages
+            const history = savedMessages.map((msg: any) => ({
+              role: msg.role,
+              content: msg.content,
+            }));
+            setConversationHistory(history);
+
+            // Mark as already greeted if there are existing messages
+            if (formattedMessages.length > 0) {
+              hasGreeted.current = true;
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load chat history:', err);
+      } finally {
+        setLoadingHistory(false);
+      }
+    };
+
+    loadHistory();
+  }, [user]);
 
   const sendMessage = useCallback(async (text: string, isGreeting = false) => {
     if (!text.trim() || !user) return;
@@ -138,16 +194,19 @@ export default function AssistantPage() {
   }, [user, conversationHistory]);
 
   useEffect(() => {
-    if (user && !hasGreeted.current) {
-      hasGreeted.current = true;
-      const hour = new Date().getHours();
-      const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-      sendMessage(
-        `Give me a brief ${timeOfDay} briefing based on my current tasks and status. Be specific and direct.`,
-        true
-      );
+    if (user && !hasGreeted.current && !loadingHistory) {
+      // Only send greeting if there's no chat history
+      if (messages.length === 0) {
+        hasGreeted.current = true;
+        const hour = new Date().getHours();
+        const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+        sendMessage(
+          `Give me a brief ${timeOfDay} briefing based on my current tasks and status. Be specific and direct.`,
+          true
+        );
+      }
     }
-  }, [user, sendMessage]);
+  }, [user, sendMessage, messages, loadingHistory]);
 
   const handleSend = () => {
     if (!input.trim() || isLoading) return;
@@ -215,7 +274,13 @@ export default function AssistantPage() {
         )}
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {messages.length === 0 && !isLoading && (
+          {messages.length === 0 && !isLoading && loadingHistory && (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-sm text-gray-400 dark:text-gray-500">Loading chat history...</p>
+            </div>
+          )}
+
+          {messages.length === 0 && !isLoading && !loadingHistory && (
             <div className="flex items-center justify-center h-full">
               <p className="text-sm text-gray-400 dark:text-gray-500">Starting up...</p>
             </div>

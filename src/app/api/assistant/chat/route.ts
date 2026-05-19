@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthToken, getAdminDb } from '@/lib/firebaseAdmin';
 import Anthropic from '@anthropic-ai/sdk';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 interface GoalData {
   id: string;
@@ -32,12 +32,13 @@ const TOOLS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'schedule_day',
-    description: 'Auto-schedule all pending tasks for today',
+    description: 'Auto-schedule all pending tasks for a given day. Use targetDate "YYYY-MM-DD" to schedule for a specific day (e.g. tomorrow). Defaults to today.',
     input_schema: {
       type: 'object' as const,
       properties: {
         workHoursStart: { type: 'number', description: 'Start hour (e.g. 8 for 8am)' },
-        workHoursEnd: { type: 'number', description: 'End hour (e.g. 18 for 6pm)' },
+        workHoursEnd: { type: 'number', description: 'End hour (e.g. 22 for 10pm)' },
+        targetDate: { type: 'string', description: 'Target date in YYYY-MM-DD format. Omit for today.' },
       },
       required: [],
     },
@@ -324,27 +325,51 @@ RULES:
 
         if (block.name === 'schedule_day') {
           const startHour = (input.workHoursStart as number) || 8;
-          const endHour = (input.workHoursEnd as number) || 18;
+          const endHour = (input.workHoursEnd as number) || 22;
           const pending = goals.filter(g => g.status === 'pending' || g.status === 'in_progress').sort((a, b) => b.priority - a.priority);
-          let currentTime = new Date();
+
+          // Determine target date (supports "YYYY-MM-DD" for scheduling tomorrow etc.)
+          let baseDate = new Date();
+          if (typeof input.targetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.targetDate)) {
+            const [y, m, d] = (input.targetDate as string).split('-').map(Number);
+            baseDate = new Date(y, m - 1, d);
+          }
+
+          let currentTime = new Date(baseDate);
           currentTime.setHours(startHour, 0, 0, 0);
-          if (currentTime.getTime() < Date.now()) {
+
+          const isToday = baseDate.toDateString() === new Date().toDateString();
+          if (isToday && currentTime.getTime() < Date.now()) {
             currentTime = new Date();
             currentTime.setMinutes(Math.ceil(currentTime.getMinutes() / 30) * 30, 0, 0);
           }
-          const endTime = new Date(); endTime.setHours(endHour, 0, 0, 0);
+
+          const endTime = new Date(baseDate);
+          endTime.setHours(endHour, 0, 0, 0);
+
+          // If already past end time today, push to next day
+          if (isToday && currentTime >= endTime) {
+            const tomorrow = new Date(baseDate);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            currentTime = new Date(tomorrow);
+            currentTime.setHours(startHour, 0, 0, 0);
+            endTime.setDate(endTime.getDate() + 1);
+          }
+
           let scheduled = 0;
           for (const task of pending.slice(0, 8)) {
             const duration = (task.estimatedDuration as number) || 60;
             const taskEnd = new Date(currentTime.getTime() + duration * 60000);
             if (taskEnd > endTime) break;
             await db.collection('users').doc(uid).collection('goals').doc(task.id).update({
-              scheduledStart: currentTime, scheduledEnd: taskEnd, updatedAt: FieldValue.serverTimestamp(),
+              scheduledStart: Timestamp.fromDate(currentTime),
+              scheduledEnd: Timestamp.fromDate(taskEnd),
+              updatedAt: FieldValue.serverTimestamp(),
             });
             currentTime = new Date(taskEnd.getTime() + 15 * 60000);
             scheduled++;
           }
-          toolResults.push({ toolName: 'schedule_day', result: `Scheduled ${scheduled} tasks for today` });
+          toolResults.push({ toolName: 'schedule_day', result: `Scheduled ${scheduled} tasks for ${baseDate.toDateString()}`, data: { scheduled } });
         }
 
         if (block.name === 'complete_task') {
