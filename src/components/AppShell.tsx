@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -79,7 +79,13 @@ const BOTTOM_NAV = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user && profile && !profile.onboardingCompleted && pathname !== '/onboard') {
+      router.push('/onboard');
+    }
+  }, [loading, user, profile, pathname, router]);
   const { mode, setMode, accentColor, setAccentColor } = useTheme();
 
   const handleSignOut = async () => {
