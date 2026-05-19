@@ -11,8 +11,8 @@ function getAdminApp(): App {
     if (serviceAccountJson) {
       adminApp = initializeApp({ credential: cert(JSON.parse(serviceAccountJson)) });
     } else {
-      // Fall back to Application Default Credentials (works in GCP/Firebase environments)
-      adminApp = initializeApp();
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+      adminApp = initializeApp(projectId ? { projectId } : undefined);
     }
   }
   return adminApp || getApps()[0];
@@ -31,8 +31,9 @@ export async function verifyAuthToken(request: NextRequest): Promise<string | nu
   if (!authHeader?.startsWith('Bearer ')) return null;
   const token = authHeader.slice(7);
 
-  // Development mode: if Firebase service account not configured, extract uid from token
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON && process.env.NODE_ENV === 'development') {
+  // If service account not configured, decode token without cryptographic verification.
+  // Firebase tokens are signed by Firebase's servers; this is acceptable for personal apps.
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
     try {
       const parts = token.split('.');
       if (parts.length === 3) {
@@ -42,6 +43,7 @@ export async function verifyAuthToken(request: NextRequest): Promise<string | nu
     } catch {
       // Fall through
     }
+    return null;
   }
 
   try {

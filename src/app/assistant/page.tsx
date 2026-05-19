@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Bot, CheckCircle } from 'lucide-react';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -157,8 +158,8 @@ export default function AssistantPage() {
     <AppShell>
       <div className="flex flex-col h-[calc(100vh-4rem)] max-w-2xl mx-auto">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
-          <div className="w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-lg flex-shrink-0">
-            🤖
+          <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-color)' }}>
+            <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
             <p className="font-semibold text-sm text-gray-900 dark:text-white">Your AI Assistant</p>
@@ -182,14 +183,14 @@ export default function AssistantPage() {
                 </div>
               ) : (
                 <div className="flex items-start gap-2 max-w-[85%]">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0 text-base">
-                    🤖
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-color)' }}>
+                    <Bot className="w-4 h-4 text-white" />
                   </div>
                   <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-800 dark:text-gray-200 shadow-sm">
                     <div>{renderContent(msg.content)}</div>
                     {msg.toolResults?.map(tr => (
                       <div key={tr.toolName} className="mt-2 flex items-center gap-1.5 text-xs text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">
-                        <span>✓</span>
+                        <CheckCircle className="w-3 h-3" />
                         <span>{tr.result}</span>
                       </div>
                     ))}
@@ -201,8 +202,8 @@ export default function AssistantPage() {
 
           {isLoading && (
             <div className="flex items-start gap-2">
-              <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center flex-shrink-0 text-base">
-                🤖
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'var(--accent-color)' }}>
+                <Bot className="w-4 h-4 text-white" />
               </div>
               <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
                 <div className="flex items-center gap-1">

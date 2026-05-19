@@ -58,27 +58,33 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const notifCollection = collection(db, 'users', user.uid, 'notifications');
     const q = query(notifCollection, orderBy('timestamp', 'desc'), limit(50));
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs: Notification[] = snapshot.docs.map((docSnap) => {
-        const data = docSnap.data();
-        const timestamp =
-          data.timestamp instanceof Timestamp
-            ? data.timestamp.toDate()
-            : data.timestamp
-            ? new Date(data.timestamp)
-            : new Date();
-        return {
-          id: docSnap.id,
-          type: data.type,
-          title: data.title,
-          message: data.message,
-          timestamp,
-          read: data.read ?? false,
-          action: undefined,
-        };
-      });
-      setNotifications(docs);
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const docs: Notification[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          const timestamp =
+            data.timestamp instanceof Timestamp
+              ? data.timestamp.toDate()
+              : data.timestamp
+              ? new Date(data.timestamp)
+              : new Date();
+          return {
+            id: docSnap.id,
+            type: data.type,
+            title: data.title,
+            message: data.message,
+            timestamp,
+            read: data.read ?? false,
+            action: undefined,
+          };
+        });
+        setNotifications(docs);
+      },
+      (err) => {
+        if (err.code !== 'permission-denied') console.error('Notifications listener error:', err);
+      }
+    );
 
     return () => unsubscribe();
   }, [user?.uid]);
