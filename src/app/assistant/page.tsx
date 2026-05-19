@@ -308,7 +308,7 @@ export default function AssistantPage() {
                         </div>
                         {tr.toolName === 'schedule_day' && (
                           <Link
-                            href="/planner?view=calendar"
+                            href={`/planner${(tr.data as { date?: string })?.date ? `?date=${(tr.data as { date?: string }).date}` : ''}`}
                             className="text-xs px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-1.5"
                           >
                             <Calendar className="w-3 h-3" />

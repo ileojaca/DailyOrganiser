@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Bot } from 'lucide-react';
 import AppShell from '@/components/AppShell';
@@ -41,14 +42,30 @@ function formatWeekLabel(weekStart: Date): string {
 export default function PlannerPage() {
   const { user } = useAuth();
   const { goals, loading: goalsLoading } = useGoals(user?.uid);
+  const searchParams = useSearchParams();
 
   const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    // Check for ?date=YYYY-MM-DD query param
+    const dateParam = searchParams?.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const [y, m, d] = dateParam.split('-').map(Number);
+      const date = new Date(y, m - 1, d);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    }
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   });
-  const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()));
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    const dateParam = searchParams?.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const [y, m, d] = dateParam.split('-').map(Number);
+      return getWeekStart(new Date(y, m - 1, d));
+    }
+    return getWeekStart(new Date());
+  });
 
   useEffect(() => {
     if (goalsLoading) return;

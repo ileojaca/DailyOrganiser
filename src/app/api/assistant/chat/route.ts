@@ -369,7 +369,8 @@ RULES:
             currentTime = new Date(taskEnd.getTime() + 15 * 60000);
             scheduled++;
           }
-          toolResults.push({ toolName: 'schedule_day', result: `Scheduled ${scheduled} tasks for ${baseDate.toDateString()}`, data: { scheduled } });
+          const scheduledDateISO = endTime.toISOString().split('T')[0];
+          toolResults.push({ toolName: 'schedule_day', result: `Scheduled ${scheduled} tasks for ${baseDate.toDateString()}`, data: { scheduled, date: scheduledDateISO } });
         }
 
         if (block.name === 'complete_task') {
