@@ -358,7 +358,12 @@ RULES:
         if (block.name === 'schedule_day') {
           const startHour = (input.workHoursStart as number) || 8;
           const endHour = (input.workHoursEnd as number) || 22;
-          const pending = goals.filter(g => g.status === 'pending' || g.status === 'in_progress').sort((a, b) => b.priority - a.priority);
+          const pending = goals
+            .filter(g =>
+              (g.status === 'pending' || g.status === 'in_progress') &&
+              (!('goalType' in g) || !g.goalType || (g.goalType as string) === 'task' || (g.goalType as string) === 'project')
+            )
+            .sort((a, b) => b.priority - a.priority);
 
           // Determine target date (supports "YYYY-MM-DD"). Falls back to client's local today.
           const rawTarget = (input.targetDate as string) || today;
@@ -458,6 +463,21 @@ RULES:
                 habitStart = new Date(habitEnd.getTime() + 5 * 60000);
               }
             }
+          }
+
+          // Also block tasks already scheduled for this day (from previous scheduling runs)
+          // so re-running schedule_day doesn't double-book existing slots
+          const pendingIds = new Set(pending.map(p => p.id));
+          for (const doc of allGoalsSnap.docs) {
+            if (pendingIds.has(doc.id)) continue; // will be re-scheduled, skip
+            const gd = doc.data();
+            if (!gd.scheduledStart || !gd.scheduledEnd) continue;
+            const sStart: Date = gd.scheduledStart.toDate?.() ?? new Date(gd.scheduledStart);
+            const sEnd: Date = gd.scheduledEnd.toDate?.() ?? new Date(gd.scheduledEnd);
+            if (sStart.toDateString() !== baseDate.toDateString()) continue;
+            // Don't double-count recurring goals already added above
+            if (applicableRecurring.some((r: Record<string, unknown>) => r.id === doc.id)) continue;
+            blockedIntervals.push({ start: sStart, end: sEnd });
           }
 
           // Helper: check if a time slot overlaps any blocked interval

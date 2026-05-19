@@ -71,11 +71,65 @@ export default function DayViewCalendar({ date, tasks, onTaskClick, onSlotClick 
   const visibleTasks = useMemo(() => {
     return tasks.filter((t) => {
       if (!t.scheduledStart) return false;
-      // Ensure scheduledStart is a Date object before comparison
       const startDate = t.scheduledStart instanceof Date ? t.scheduledStart : new Date(t.scheduledStart);
       return isSameDay(startDate, date);
     });
   }, [tasks, date]);
+
+  // Compute overlap columns so tasks that share time render side-by-side
+  const taskLayout = useMemo(() => {
+    type LayoutItem = { task: (typeof visibleTasks)[0]; col: number; cols: number };
+    const items: LayoutItem[] = visibleTasks.map(t => ({ task: t, col: 0, cols: 1 }));
+
+    // Sort by start time
+    items.sort((a, b) => {
+      const aStart = a.task.scheduledStart instanceof Date ? a.task.scheduledStart : new Date(a.task.scheduledStart!);
+      const bStart = b.task.scheduledStart instanceof Date ? b.task.scheduledStart : new Date(b.task.scheduledStart!);
+      return aStart.getTime() - bStart.getTime();
+    });
+
+    // Build collision groups
+    const groups: LayoutItem[][] = [];
+    for (const item of items) {
+      const tStart = item.task.scheduledStart instanceof Date ? item.task.scheduledStart : new Date(item.task.scheduledStart!);
+      const tEnd = item.task.scheduledEnd
+        ? (item.task.scheduledEnd instanceof Date ? item.task.scheduledEnd : new Date(item.task.scheduledEnd))
+        : new Date(tStart.getTime() + (item.task.estimatedDuration || 30) * 60000);
+
+      let placed = false;
+      for (const group of groups) {
+        const groupEnd = group.reduce((maxEnd, g) => {
+          const gEnd = g.task.scheduledEnd
+            ? (g.task.scheduledEnd instanceof Date ? g.task.scheduledEnd : new Date(g.task.scheduledEnd))
+            : new Date((g.task.scheduledStart instanceof Date ? g.task.scheduledStart : new Date(g.task.scheduledStart!)).getTime() + (g.task.estimatedDuration || 30) * 60000);
+          return gEnd > maxEnd ? gEnd : maxEnd;
+        }, new Date(0));
+
+        if (tStart < groupEnd) {
+          // overlaps this group — assign next available column
+          const usedCols = new Set(group.map(g => g.col));
+          let col = 0;
+          while (usedCols.has(col)) col++;
+          item.col = col;
+          group.push(item);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        item.col = 0;
+        groups.push([item]);
+      }
+    }
+
+    // Set cols = max column count in each group
+    for (const group of groups) {
+      const maxCol = group.reduce((m, g) => Math.max(m, g.col), 0);
+      group.forEach(g => { g.cols = maxCol + 1; });
+    }
+
+    return new Map(items.map(i => [i.task.id, { col: i.col, cols: i.cols }]));
+  }, [visibleTasks]);
 
   const nowTop = useMemo(() => {
     if (!isToday) return null;
@@ -154,15 +208,21 @@ export default function DayViewCalendar({ date, tasks, onTaskClick, onSlotClick 
                 ? (task.scheduledEnd instanceof Date ? task.scheduledEnd : new Date(task.scheduledEnd))
                 : new Date(start.getTime() + (task.estimatedDuration || 30) * 60000);
               const colorClass = CATEGORY_COLORS[task.category] || 'bg-gray-500 text-white border-gray-600';
+              const layout = taskLayout.get(task.id) ?? { col: 0, cols: 1 };
+              const colW = 100 / layout.cols;
+              const leftPct = layout.col * colW;
+              const GAP = 2; // px gap between columns
 
               return (
                 <div
                   key={task.id}
-                  className={`absolute left-1 right-1 rounded border px-1.5 py-0.5 overflow-hidden cursor-pointer hover:opacity-90 z-10 ${colorClass}`}
+                  className={`absolute rounded border px-1.5 py-0.5 overflow-hidden cursor-pointer hover:opacity-90 z-10 ${colorClass}`}
                   style={{
                     top: topPercent(start),
                     height: heightPercent(start, end),
                     minHeight: '24px',
+                    left: `calc(${leftPct}% + ${GAP}px)`,
+                    width: `calc(${colW}% - ${GAP * 2}px)`,
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -172,6 +232,9 @@ export default function DayViewCalendar({ date, tasks, onTaskClick, onSlotClick 
                   <p className="text-xs font-medium truncate leading-tight">{task.title}</p>
                   <p className="text-[10px] opacity-80 leading-tight">
                     {start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                    {layout.cols > 1 && end && (
+                      <span> – {end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}</span>
+                    )}
                   </p>
                 </div>
               );
