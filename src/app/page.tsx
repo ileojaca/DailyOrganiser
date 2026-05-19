@@ -11,6 +11,7 @@ import {
 import AppShell from '@/components/AppShell';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import LandingPage from '@/components/LandingPage';
+import CreateGoalModal from '@/components/CreateGoalModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -129,6 +130,7 @@ export default function Home() {
   const [alertsFired, setAlertsFired] = useState(false);
   const [quickTask, setQuickTask] = useState('');
   const [addingTask, setAddingTask] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const hour = new Date().getHours();
   const name = profile?.fullName?.split(' ')[0] || 'there';
@@ -407,6 +409,14 @@ export default function Home() {
               >
                 +
               </button>
+              <button
+                type="button"
+                onClick={() => setModalOpen(true)}
+                className="w-11 h-11 flex items-center justify-center text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-gray-700 shadow-sm flex-shrink-0 transition-colors"
+                title="Add goal with details"
+              >
+                ⋯
+              </button>
             </div>
           </form>
 
@@ -504,6 +514,14 @@ export default function Home() {
       </div>
 
       {showOnboarding && <OnboardingFlow onComplete={completeOnboarding} />}
+
+      <CreateGoalModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSuccess={() => {
+          addNotification({ type: 'success', title: 'Goal created', message: 'Your goal has been added.' });
+        }}
+      />
     </AppShell>
   );
 }

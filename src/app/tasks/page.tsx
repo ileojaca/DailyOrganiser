@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import AppShell from '@/components/AppShell';
+import CreateGoalModal from '@/components/CreateGoalModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
@@ -41,7 +42,7 @@ type SortType = 'priority' | 'due' | 'created';
 
 export default function TasksPage() {
   const { user } = useAuth();
-  const { goals, createGoal, updateGoal, completeGoal } = useGoals(user?.uid);
+  const { goals, createGoal, updateGoal, completeGoal, loading: goalsLoading } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('priority');
@@ -49,6 +50,7 @@ export default function TasksPage() {
   const [quickCategory, setQuickCategory] = useState<'work' | 'personal' | 'health' | 'learning' | 'social' | 'family'>('personal');
   const [quickPriority, setQuickPriority] = useState(3);
   const [addingTask, setAddingTask] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const filteredTasks = goals.filter(g => {
     if (filter === 'all') return g.status === 'pending' || g.status === 'in_progress';
@@ -217,68 +219,93 @@ export default function TasksPage() {
           </div>
         )}
 
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add a new task</h2>
-          <form onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }} className="space-y-4">
-            <div>
-              <input
-                type="text"
-                value={quickTask}
-                onChange={(e) => setQuickTask(e.target.value)}
-                placeholder="What's your next task?"
-                className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent shadow-sm"
-                style={{ '--tw-ring-color': 'color-mix(in srgb, var(--accent-color) 30%, transparent)' } as React.CSSProperties}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Quick add form */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Quick add</h2>
+            <form onSubmit={(e) => { e.preventDefault(); handleQuickAdd(); }} className="space-y-4">
               <div>
-                <label htmlFor="category" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-                <select
-                  id="category"
-                  value={quickCategory}
-                  onChange={(e) => setQuickCategory(e.target.value as typeof quickCategory)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
-                >
-                  <option value="work">Work</option>
-                  <option value="personal">Personal</option>
-                  <option value="health">Health</option>
-                  <option value="learning">Learning</option>
-                  <option value="social">Social</option>
-                  <option value="family">Family</option>
-                </select>
+                <input
+                  type="text"
+                  value={quickTask}
+                  onChange={(e) => setQuickTask(e.target.value)}
+                  placeholder="What's your next task?"
+                  className="w-full px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent shadow-sm"
+                  style={{ '--tw-ring-color': 'color-mix(in srgb, var(--accent-color) 30%, transparent)' } as React.CSSProperties}
+                />
               </div>
 
-              <div>
-                <label htmlFor="priority" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
-                <select
-                  id="priority"
-                  value={quickPriority}
-                  onChange={(e) => setQuickPriority(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
-                >
-                  <option value="1">Low</option>
-                  <option value="2">Normal</option>
-                  <option value="3">Medium</option>
-                  <option value="4">High</option>
-                  <option value="5">Critical</option>
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="category" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+                  <select
+                    id="category"
+                    value={quickCategory}
+                    onChange={(e) => setQuickCategory(e.target.value as typeof quickCategory)}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                  >
+                    <option value="work">Work</option>
+                    <option value="personal">Personal</option>
+                    <option value="health">Health</option>
+                    <option value="learning">Learning</option>
+                    <option value="social">Social</option>
+                    <option value="family">Family</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="priority" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+                  <select
+                    id="priority"
+                    value={quickPriority}
+                    onChange={(e) => setQuickPriority(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                  >
+                    <option value="1">Low</option>
+                    <option value="2">Normal</option>
+                    <option value="3">Medium</option>
+                    <option value="4">High</option>
+                    <option value="5">Critical</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="col-span-2 sm:col-span-1">
-                <button
-                  type="submit"
-                  disabled={!quickTask.trim() || addingTask}
-                  className="w-full h-10 text-white font-semibold rounded-lg disabled:opacity-40 transition-opacity"
-                  style={{ background: 'var(--accent-color)' }}
-                >
-                  {addingTask ? 'Adding...' : 'Add Task'}
-                </button>
+              <button
+                type="submit"
+                disabled={!quickTask.trim() || addingTask}
+                className="w-full h-10 text-white font-semibold rounded-lg disabled:opacity-40 transition-opacity"
+                style={{ background: 'var(--accent-color)' }}
+              >
+                {addingTask ? 'Adding...' : 'Add Task'}
+              </button>
+            </form>
+          </div>
+
+          {/* Detailed add */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add with details</h2>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl text-gray-600 dark:text-gray-400 hover:border-accent hover:text-accent hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-all flex items-center justify-center"
+              style={{ '--hover-color': 'var(--accent-color)' } as React.CSSProperties}
+            >
+              <div className="text-center">
+                <div className="text-3xl mb-2">+</div>
+                <p className="font-medium">Add goal with description</p>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Set duration, category, and add notes</p>
               </div>
-            </div>
-          </form>
+            </button>
+          </div>
         </div>
       </div>
+
+      <CreateGoalModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSuccess={() => {
+          addNotification({ type: 'success', title: 'Goal created', message: 'Your goal has been added.' });
+        }}
+      />
     </AppShell>
   );
 }
