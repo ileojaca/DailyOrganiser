@@ -318,7 +318,10 @@ RULES:
     });
 
   } catch (error) {
-    console.error('Chat API error:', error);
-    return NextResponse.json({ error: 'Something went wrong. Please try again.' }, { status: 500 });
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error('Chat API error:', errorMsg, error);
+    return NextResponse.json({
+      error: `Something went wrong: ${errorMsg}`
+    }, { status: 500 });
   }
 }
