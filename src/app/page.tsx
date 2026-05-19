@@ -167,6 +167,10 @@ export default function Home() {
     .sort((a, b) => b.priority - a.priority)
     .slice(0, 8);
 
+  const scheduledTasksToday = activeTasks
+    .filter(g => g.scheduledStart && new Date(g.scheduledStart) >= today && new Date(g.scheduledStart) < tomorrow)
+    .sort((a, b) => new Date(a.scheduledStart!).getTime() - new Date(b.scheduledStart!).getTime());
+
   const workLifeScore = useMemo(() => {
     const recent = goals.filter(g => {
       if (g.status !== 'completed' || !g.completedAt) return false;
@@ -409,6 +413,50 @@ export default function Home() {
               </button>
             </div>
           </form>
+
+          {scheduledTasksToday.length > 0 && (
+            <>
+              <div className="flex items-center justify-between px-4 mb-2">
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Today&apos;s Schedule</h2>
+                <Link href="/planner?view=calendar" className="text-xs font-medium" style={{ color: 'var(--accent-color)' }}>View calendar →</Link>
+              </div>
+              <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl mx-4 mb-6 overflow-hidden shadow-sm">
+                {scheduledTasksToday.map((task, idx) => {
+                  const start = new Date(task.scheduledStart!);
+                  const end = task.scheduledEnd ? new Date(task.scheduledEnd) : new Date(start.getTime() + (task.estimatedDuration || 30) * 60000);
+                  const timeStr = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                  const endStr = end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                  return (
+                    <div
+                      key={task.id}
+                      className={`flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${idx < scheduledTasksToday.length - 1 ? 'border-b border-gray-50 dark:border-gray-700' : ''}`}
+                    >
+                      <div className={`w-1 h-10 rounded-full flex-shrink-0 ${priorityBarColor(task.priority)}`} />
+                      <button
+                        onClick={() => handleTaskCircleClick(task)}
+                        className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-accent flex-shrink-0 flex items-center justify-center transition-colors"
+                        style={{ borderColor: task.status === 'in_progress' ? 'var(--accent-color)' : undefined }}
+                      >
+                        {task.status === 'in_progress' && (
+                          <div className="w-2 h-2 rounded-full" style={{ background: 'var(--accent-color)' }} />
+                        )}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{task.title}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Clock className="w-3 h-3 text-gray-400" />
+                          <span className="text-xs text-gray-500">{timeStr} – {endStr}</span>
+                        </div>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${priorityBadge(task.priority)}`}>
+                        {PRIORITY_LABEL[task.priority] || 'Medium'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
 
           <div className="flex items-center justify-between px-4 mb-2">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-400">Today&apos;s Tasks</h2>

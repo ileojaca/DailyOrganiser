@@ -1,7 +1,8 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import SmartTimeBlocking from '@/components/SmartTimeBlocking';
 import DayViewCalendar from '@/components/DayViewCalendar';
@@ -51,6 +52,7 @@ function addDays(date: Date, days: number): Date {
 
 export default function PlannerPage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const { timeBlocks, loading, createTimeBlock, deleteTimeBlock } = useTimeBlocks(user?.uid);
   const { goals, loading: goalsLoading, updateGoal } = useGoals(user?.uid);
   const { logs } = useAccomplishmentLogs(user?.uid);
@@ -63,7 +65,7 @@ export default function PlannerPage() {
   const [scheduleInfo, setScheduleInfo] = useState<string>('');
   const [scheduledCount, setScheduledCount] = useState(0);
   const [unscheduledCount, setUnscheduledCount] = useState(0);
-  const [dayViewActive, setDayViewActive] = useState(false);
+  const [dayViewActive, setDayViewActive] = useState(() => searchParams.get('view') === 'calendar');
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);

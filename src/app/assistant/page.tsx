@@ -2,7 +2,8 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, CheckCircle } from 'lucide-react';
+import { Bot, CheckCircle, Calendar } from 'lucide-react';
+import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -189,9 +190,20 @@ export default function AssistantPage() {
                   <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-800 dark:text-gray-200 shadow-sm">
                     <div>{renderContent(msg.content)}</div>
                     {msg.toolResults?.map(tr => (
-                      <div key={tr.toolName} className="mt-2 flex items-center gap-1.5 text-xs text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">
-                        <CheckCircle className="w-3 h-3" />
-                        <span>{tr.result}</span>
+                      <div key={tr.toolName} className="mt-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>{tr.result}</span>
+                        </div>
+                        {tr.toolName === 'schedule_day' && (
+                          <Link
+                            href="/planner?view=calendar"
+                            className="text-xs px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-1.5"
+                          >
+                            <Calendar className="w-3 h-3" />
+                            View in calendar
+                          </Link>
+                        )}
                       </div>
                     ))}
                   </div>
