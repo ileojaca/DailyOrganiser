@@ -142,6 +142,8 @@ export default function Home() {
   const [sleepHours, setSleepHours] = useState<number>(7);
   const [savingSleep, setSavingSleep] = useState(false);
   const [gamification, setGamification] = useState<{ totalPoints: number; currentStreak: number; level: number; achievements: Array<{ name: string; icon: string }> }>({ totalPoints: 0, currentStreak: 0, level: 0, achievements: [] });
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const hour = new Date().getHours();
   const name = profile?.fullName?.split(' ')[0] || 'there';
@@ -260,6 +262,31 @@ export default function Home() {
     const neverShow = localStorage.getItem('dailyOrganiserNeverShowOnboarding') === 'true';
     if (!neverShow && goals.length === 0) setShowOnboarding(true);
   }, [goals.length]);
+
+  // Fetch AI suggestions once when tasks are loaded
+  const fetchSuggestions = useCallback(async () => {
+    if (!user || goals.length === 0 || aiSuggestions.length > 0) return;
+    setLoadingSuggestions(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/insights?type=suggestions', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const tips: string[] = data.suggestions || data.insights?.suggestions || [];
+        if (tips.length) setAiSuggestions(tips.slice(0, 3));
+      }
+    } catch {
+      // suggestions are optional, fail silently
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [user, goals.length, aiSuggestions.length]);
+
+  useEffect(() => {
+    fetchSuggestions();
+  }, [fetchSuggestions]);
 
   // Subscribe to gamification data
   useEffect(() => {
@@ -599,6 +626,36 @@ export default function Home() {
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">{completedWeek.length} tasks completed</p>
             </div>
           )}
+
+          {/* AI Insights card */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <Bot className="w-4 h-4" style={{ color: 'var(--accent-color)' }} />
+                AI Insights
+              </h3>
+              <Link href="/assistant" className="text-xs font-medium" style={{ color: 'var(--accent-color)' }}>Chat →</Link>
+            </div>
+            {loadingSuggestions ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <div key={i} className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />)}
+              </div>
+            ) : aiSuggestions.length > 0 ? (
+              <ul className="space-y-2">
+                {aiSuggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <span className="mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold" style={{ background: 'var(--accent-color)' }}>{i + 1}</span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-xs text-gray-400 mb-2">Ask the AI to analyse your schedule</p>
+                <Link href="/assistant" className="text-xs font-medium px-3 py-1.5 rounded-lg text-white inline-block" style={{ background: 'var(--accent-color)' }}>Open Assistant</Link>
+              </div>
+            )}
+          </div>
 
           <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Navigation</h3>
