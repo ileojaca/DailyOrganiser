@@ -4,9 +4,8 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import {
-  AlertCircle, AlertTriangle, Info, Award, Target, Sunrise, Coffee, Clock,
-  Briefcase, Star, Activity, BookOpen, Users, Heart,
-  FileText, Timer, Bot, Moon, Flame, CheckSquare, Calendar, ChevronRight,
+  AlertCircle, AlertTriangle, Info, Target, Clock, Briefcase, Star, Activity,
+  BookOpen, Users, Heart, FileText, Bot, Calendar, ChevronRight, Moon,
 } from 'lucide-react';
 import AppShell from '@/components/AppShell';
 import OnboardingFlow from '@/components/OnboardingFlow';
@@ -14,10 +13,18 @@ import LandingPage from '@/components/LandingPage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
-import { useGamification } from '@/hooks/useGamification';
 import { useSleepAndEnergy } from '@/hooks/useSleepAndEnergy';
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Normal', 3: 'Medium', 4: 'High', 5: 'Critical' };
+
+const CATEGORY_INFO: Record<string, { label: string; icon: any; color: string }> = {
+  work: { label: 'Work', icon: Briefcase, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20' },
+  personal: { label: 'Personal', icon: Star, color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20' },
+  health: { label: 'Health', icon: Activity, color: 'text-green-600 bg-green-50 dark:bg-green-900/20' },
+  learning: { label: 'Learning', icon: BookOpen, color: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20' },
+  social: { label: 'Social', icon: Users, color: 'text-pink-600 bg-pink-50 dark:bg-pink-900/20' },
+  family: { label: 'Family', icon: Heart, color: 'text-red-600 bg-red-50 dark:bg-red-900/20' },
+};
 
 function CategoryIcon({ category }: { category: string }) {
   const cls = 'w-3 h-3 inline-block';
@@ -63,7 +70,6 @@ interface SmartMessageContext {
   overdueTasks: { title: string }[];
   dueTodayTasks: { title: string }[];
   topTask: { title: string } | null;
-  avgEnergy: number;
   completedToday: number;
 }
 
@@ -123,12 +129,13 @@ export default function Home() {
   const { profile, user } = useAuth();
   const { goals, createGoal, updateGoal, completeGoal } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
-  const { progress: gamificationProgress } = useGamification();
-  const { energy } = useSleepAndEnergy(user?.uid);
+  const { energy, updateEnergy } = useSleepAndEnergy(user?.uid);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [alertsFired, setAlertsFired] = useState(false);
   const [quickTask, setQuickTask] = useState('');
   const [addingTask, setAddingTask] = useState(false);
+  const [sleepHours, setSleepHours] = useState<number>(energy.lastSleepDuration || 7);
+  const [savingSleep, setSavingSleep] = useState(false);
 
   const hour = new Date().getHours();
   const name = profile?.fullName?.split(' ')[0] || 'there';
@@ -138,10 +145,18 @@ export default function Home() {
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
+  const sevenDaysAgo = new Date(today);
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
   const activeTasks = goals.filter(g => g.status === 'pending' || g.status === 'in_progress');
   const completedToday = goals.filter(g => {
     if (g.status !== 'completed' || !g.completedAt) return false;
     return new Date(g.completedAt) >= today;
+  });
+
+  const completedWeek = goals.filter(g => {
+    if (g.status !== 'completed' || !g.completedAt) return false;
+    return new Date(g.completedAt) >= sevenDaysAgo;
   });
 
   const overdueTasks = activeTasks.filter(g => {
@@ -171,26 +186,32 @@ export default function Home() {
     .filter(g => g.scheduledStart && new Date(g.scheduledStart) >= today && new Date(g.scheduledStart) < tomorrow)
     .sort((a, b) => new Date(a.scheduledStart!).getTime() - new Date(b.scheduledStart!).getTime());
 
-  const workLifeScore = useMemo(() => {
-    const recent = goals.filter(g => {
-      if (g.status !== 'completed' || !g.completedAt) return false;
-      const days = (Date.now() - new Date(g.completedAt).getTime()) / (1000 * 60 * 60 * 24);
-      return days <= 7;
+  const weeklyBalance = useMemo(() => {
+    const breakdown: Record<string, number> = {};
+    Object.keys(CATEGORY_INFO).forEach(cat => breakdown[cat] = 0);
+    completedWeek.forEach(task => {
+      breakdown[task.category]++;
     });
-    if (recent.length === 0) return null;
-    const workCount = recent.filter(g => g.category === 'work').length;
-    const deviation = Math.abs(workCount / recent.length - 0.4);
-    return Math.round(Math.max(0, 100 - deviation * 150));
-  }, [goals]);
+    return breakdown;
+  }, [completedWeek]);
 
   const smartMsg = getSmartMessage({
     hour,
     overdueTasks,
     dueTodayTasks,
     topTask: topPriorityTask,
-    avgEnergy: energy.currentLevel ?? 5,
     completedToday: completedToday.length,
   });
+
+  const handleSleepUpdate = async (value: number) => {
+    setSleepHours(value);
+    setSavingSleep(true);
+    try {
+      await updateEnergy({ lastSleepDuration: value });
+    } finally {
+      setSavingSleep(false);
+    }
+  };
 
   useEffect(() => {
     if (!user || goals.length === 0 || alertsFired) return;
@@ -263,37 +284,37 @@ export default function Home() {
               <Target className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">Welcome, {name}!</h1>
-            <p className="text-gray-600 dark:text-gray-400 text-lg">Get organized, stay focused, and crush your goals.</p>
+            <p className="text-gray-600 dark:text-gray-400 text-lg">Get organized, stay balanced, and achieve your goals.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
             <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-all cursor-default">
               <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-3">
-                <CheckSquare className="w-5 h-5 text-blue-500" />
+                <Target className="w-5 h-5 text-blue-500" />
               </div>
-              <p className="font-semibold text-gray-900 dark:text-white mb-1">Create Tasks</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Add goals and track progress</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">Create Goals</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Track your progress daily</p>
             </div>
             <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-all cursor-default">
               <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center mb-3">
-                <Timer className="w-5 h-5 text-purple-500" />
+                <Bot className="w-5 h-5 text-purple-500" />
               </div>
-              <p className="font-semibold text-gray-900 dark:text-white mb-1">Focus Sessions</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Deep work with the Pomodoro timer</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">AI Planning</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Smart scheduling with balance awareness</p>
             </div>
             <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-all cursor-default">
               <div className="w-10 h-10 rounded-xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-3">
-                <Bot className="w-5 h-5 text-green-500" />
+                <Calendar className="w-5 h-5 text-green-500" />
               </div>
-              <p className="font-semibold text-gray-900 dark:text-white mb-1">AI Assistant</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Get smart recommendations and briefings</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">Visual Calendar</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">See your day at a glance</p>
             </div>
             <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-all cursor-default">
               <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-3">
                 <Moon className="w-5 h-5 text-indigo-500" />
               </div>
-              <p className="font-semibold text-gray-900 dark:text-white mb-1">Track Health</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Monitor sleep, energy, and habits</p>
+              <p className="font-semibold text-gray-900 dark:text-white mb-1">Sleep & Balance</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Track wellness and work-life balance</p>
             </div>
           </div>
 
@@ -347,48 +368,35 @@ export default function Home() {
             </div>
           </div>
 
-          {topPriorityTask && (
-            <div
-              className="mx-4 mb-4 rounded-2xl p-5 text-white"
-              style={{ background: 'linear-gradient(135deg, var(--accent-color), color-mix(in srgb, var(--accent-color) 70%, black))' }}
-            >
-              <p className="text-xs font-semibold uppercase tracking-widest text-white/70 mb-1">Today&apos;s Focus</p>
-              <p className="text-lg font-bold leading-snug mb-3">{topPriorityTask.title}</p>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-white/80 text-sm">
-                  {topPriorityTask.estimatedDuration && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{topPriorityTask.estimatedDuration}m</span>}
-                  <span>{PRIORITY_LABEL[topPriorityTask.priority] || 'Medium'} priority</span>
-                </div>
-                <Link
-                  href="/focus"
-                  className="bg-white/20 hover:bg-white/30 text-white text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  Start →
-                </Link>
+          <div className="flex gap-3 px-4 mb-5 overflow-x-auto pb-1">
+            <div className="flex-shrink-0 flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl px-3 py-2 shadow-sm">
+              <Moon className="w-4 h-4 text-indigo-500" />
+              <div className="flex items-center gap-1">
+                <input
+                  type="range"
+                  min="3"
+                  max="12"
+                  value={sleepHours}
+                  onChange={e => handleSleepUpdate(Number(e.target.value))}
+                  className="w-16 h-1 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                />
+                <span className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">{sleepHours}h</span>
               </div>
             </div>
-          )}
-
-          <div className="flex gap-2 px-4 mb-5 overflow-x-auto pb-1">
-            <div className="flex-shrink-0 flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-full px-3 py-1.5 shadow-sm">
+            <div className="flex-shrink-0 flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-full px-3 py-2 shadow-sm">
               <span className="text-sm font-bold text-gray-900 dark:text-white">{activeTasks.length}</span>
               <span className="text-xs text-gray-500">active</span>
             </div>
-            <div className={`flex-shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 shadow-sm ${overdueTasks.length > 0 ? 'bg-red-50 border border-red-100' : 'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700'}`}>
-              <span className={`text-sm font-bold ${overdueTasks.length > 0 ? 'text-red-600' : 'text-gray-900 dark:text-white'}`}>{overdueTasks.length}</span>
-              <span className="text-xs text-gray-500">overdue</span>
-            </div>
-            {gamificationProgress && (
-              <div className="flex-shrink-0 flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-full px-3 py-1.5 shadow-sm">
-                <Flame className="w-3.5 h-3.5 text-amber-500" />
-                <span className="text-sm font-bold text-amber-700">{gamificationProgress.currentStreak}</span>
-                <span className="text-xs text-amber-600">day streak</span>
+            {overdueTasks.length > 0 && (
+              <div className="flex-shrink-0 flex items-center gap-1.5 bg-red-50 border border-red-100 dark:bg-red-900/20 dark:border-red-900 rounded-full px-3 py-2 shadow-sm">
+                <span className="text-sm font-bold text-red-600 dark:text-red-400">{overdueTasks.length}</span>
+                <span className="text-xs text-red-600 dark:text-red-400">overdue</span>
               </div>
             )}
-            {workLifeScore !== null && (
-              <div className="flex-shrink-0 flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-full px-3 py-1.5 shadow-sm">
-                <span className="text-sm font-bold text-gray-900 dark:text-white">{workLifeScore}</span>
-                <span className="text-xs text-gray-500">balance</span>
+            {completedToday.length > 0 && (
+              <div className="flex-shrink-0 flex items-center gap-1.5 bg-green-50 border border-green-100 dark:bg-green-900/20 dark:border-green-900 rounded-full px-3 py-2 shadow-sm">
+                <span className="text-sm font-bold text-green-600 dark:text-green-400">{completedToday.length}</span>
+                <span className="text-xs text-green-600 dark:text-green-400">completed</span>
               </div>
             )}
           </div>
@@ -503,38 +511,46 @@ export default function Home() {
         </div>
 
         <div className="hidden xl:block space-y-4">
-          {gamificationProgress && (
+          {completedWeek.length > 0 && (
             <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-gray-900 dark:text-white">Your Progress</span>
-                <span
-                  className="text-xs px-2 py-0.5 rounded-full font-medium"
-                  style={{ background: 'color-mix(in srgb, var(--accent-color) 10%, transparent)', color: 'var(--accent-color)' }}
-                >
-                  Lvl {gamificationProgress.level}
-                </span>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">This Week's Balance</h3>
+              <div className="space-y-2.5">
+                {Object.entries(weeklyBalance).map(([category, count]) => {
+                  const total = completedWeek.length;
+                  const percent = total > 0 ? Math.round((count / total) * 100) : 0;
+                  const info = CATEGORY_INFO[category];
+                  const Icon = info.icon;
+                  return (
+                    <div key={category}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <Icon className="w-4 h-4" style={{ color: info.color.split(' ')[0].replace('text-', '') }} />
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{info.label}</span>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">{count}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${info.color.split(' ')[1]}`}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="flex items-center gap-4">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center gap-1"><Flame className="w-5 h-5 text-amber-500" />{gamificationProgress.currentStreak}</p>
-                  <p className="text-xs text-gray-500">day streak</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{gamificationProgress.totalPoints.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500">points</p>
-                </div>
-              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">{completedWeek.length} tasks completed</p>
             </div>
           )}
 
           <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Quick Links</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Navigation</h3>
             <div className="space-y-1">
               {[
-                { href: '/tasks', icon: <CheckSquare className="w-4 h-4" />, label: 'Tasks' },
-                { href: '/focus', icon: <Timer className="w-4 h-4" />, label: 'Focus' },
+                { href: '/tasks', icon: <Target className="w-4 h-4" />, label: 'All Tasks' },
                 { href: '/assistant', icon: <Bot className="w-4 h-4" />, label: 'AI Assistant' },
                 { href: '/planner', icon: <Calendar className="w-4 h-4" />, label: 'Planner' },
+                { href: '/settings', icon: <Briefcase className="w-4 h-4" />, label: 'Settings' },
               ].map(l => (
                 <Link
                   key={l.href}
