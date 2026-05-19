@@ -4,14 +4,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const token = authHeader.slice(7);
-    const decodedToken = await verifyAuthToken(token);
-    const uid = decodedToken.uid;
 
     const body = await request.json();
     const { title, description, estimatedDuration, priority, category } = body;
@@ -45,9 +41,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error('Goal creation error:', error);
-    if (error instanceof Error && error.message === 'Auth token is invalid or expired') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
     return NextResponse.json({ error: 'Failed to create goal' }, { status: 500 });
   }
 }

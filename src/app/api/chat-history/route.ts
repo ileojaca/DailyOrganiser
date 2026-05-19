@@ -4,20 +4,16 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const token = authHeader.slice(7);
-    const decodedToken = await verifyAuthToken(token);
-    const userId = decodedToken.uid;
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
 
     const db = getAdminDb();
-    const chatRef = db.collection('users').doc(userId).collection('aiChats').doc(date);
+    const chatRef = db.collection('users').doc(uid).collection('aiChats').doc(date);
     const doc = await chatRef.get();
 
     if (!doc.exists) {
@@ -36,14 +32,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
+    const uid = await verifyAuthToken(request);
+    if (!uid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const token = authHeader.slice(7);
-    const decodedToken = await verifyAuthToken(token);
-    const userId = decodedToken.uid;
 
     const body = await request.json();
     const { role, content, timestamp } = body;
@@ -54,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const date = new Date(timestamp || new Date()).toISOString().split('T')[0];
     const db = getAdminDb();
-    const chatRef = db.collection('users').doc(userId).collection('aiChats').doc(date);
+    const chatRef = db.collection('users').doc(uid).collection('aiChats').doc(date);
 
     await chatRef.set(
       {

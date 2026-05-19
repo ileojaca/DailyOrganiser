@@ -31,12 +31,13 @@ const TOOLS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'schedule_day',
-    description: 'Auto-schedule all pending tasks for today using intelligent scheduling',
+    description: 'Auto-schedule all pending tasks for a given day. Use targetDate "YYYY-MM-DD" to schedule for a specific day (e.g. tomorrow). Defaults to today.',
     input_schema: {
       type: 'object' as const,
       properties: {
         workHoursStart: { type: 'number', description: 'Start hour (e.g. 8 for 8am)' },
-        workHoursEnd: { type: 'number', description: 'End hour (e.g. 18 for 6pm)' },
+        workHoursEnd: { type: 'number', description: 'End hour (e.g. 22 for 10pm)' },
+        targetDate: { type: 'string', description: 'Target date in YYYY-MM-DD format. Omit for today.' },
       },
       required: [],
     },
@@ -229,19 +230,39 @@ RULES:
 
         if (block.name === 'schedule_day') {
           const startHour = (input.workHoursStart as number) || 8;
-          const endHour = (input.workHoursEnd as number) || 18;
+          const endHour = (input.workHoursEnd as number) || 22;
           const pendingGoals = goals.filter(g => g.status === 'pending' || g.status === 'in_progress');
           const sortedByPriority = pendingGoals.sort((a, b) => b.priority - a.priority);
 
-          let currentTime = new Date();
+          // Determine target date (default today, supports "YYYY-MM-DD" for tomorrow etc.)
+          let baseDate = new Date();
+          if (typeof input.targetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.targetDate)) {
+            const [y, m, d] = (input.targetDate as string).split('-').map(Number);
+            baseDate = new Date(y, m - 1, d);
+          }
+
+          // Start from work start hour on the target date
+          let currentTime = new Date(baseDate);
           currentTime.setHours(startHour, 0, 0, 0);
-          if (currentTime.getTime() < Date.now()) {
+
+          // If scheduling for today and start time is in the past, start from now (rounded up)
+          const isToday = baseDate.toDateString() === new Date().toDateString();
+          if (isToday && currentTime.getTime() < Date.now()) {
             currentTime = new Date();
             currentTime.setMinutes(Math.ceil(currentTime.getMinutes() / 30) * 30, 0, 0);
           }
 
-          const endTime = new Date();
+          const endTime = new Date(baseDate);
           endTime.setHours(endHour, 0, 0, 0);
+
+          // If current time is already past endHour today, push to next day at startHour
+          if (isToday && currentTime >= endTime) {
+            const tomorrow = new Date(baseDate);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            currentTime = new Date(tomorrow);
+            currentTime.setHours(startHour, 0, 0, 0);
+            endTime.setDate(endTime.getDate() + 1);
+          }
 
           let scheduled = 0;
           for (const task of sortedByPriority.slice(0, 8)) {
@@ -256,7 +277,8 @@ RULES:
             currentTime = new Date(taskEnd.getTime() + 15 * 60 * 1000);
             scheduled++;
           }
-          toolResults.push({ toolName: 'schedule_day', result: `Scheduled ${scheduled} tasks for today`, data: { scheduled } });
+          const scheduledDate = currentTime.toDateString();
+          toolResults.push({ toolName: 'schedule_day', result: `Scheduled ${scheduled} tasks for ${scheduledDate}`, data: { scheduled } });
         }
 
         if (block.name === 'complete_task') {
