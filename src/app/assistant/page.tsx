@@ -135,6 +135,8 @@ export default function AssistantPage() {
         body: JSON.stringify({
           message: text,
           conversationHistory: conversationHistory.slice(-10),
+          clientDate: new Date().toISOString().split('T')[0], // Send client's local date (YYYY-MM-DD)
+          clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
 

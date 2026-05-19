@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI not configured' }, { status: 503 });
     }
 
-    const { message, conversationHistory = [] } = await request.json();
+    const { message, conversationHistory = [], clientDate, clientTimezone } = await request.json();
 
     // Load user context — fail gracefully if Firestore unavailable
     let goals: GoalData[] = [];
@@ -181,7 +181,11 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const hour = now.getHours();
     const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-    const today = now.toISOString().split('T')[0];
+    // Use the client's local date if provided (avoids timezone mismatch where server date ≠ user date)
+    const today = (typeof clientDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(clientDate))
+      ? clientDate
+      : now.toISOString().split('T')[0];
+    const tz = typeof clientTimezone === 'string' ? clientTimezone : 'UTC';
     const overdueTasks = goals.filter(g => { const d = toDate(g.deadline); return d && d < now; });
     const todayTasks = goals.filter(g => {
       const d = toDate(g.deadline);
@@ -224,9 +228,17 @@ export async function POST(request: NextRequest) {
 
     const sleepDisplay = todaySleep !== null ? `${todaySleep}h (logged today)` : `${avgSleep.toFixed(1)}h avg`;
 
+    const tomorrow = (() => {
+      const [y, m, d] = today.split('-').map(Number);
+      const t = new Date(y, m - 1, d + 1);
+      return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    })();
+
     const systemPrompt = `You are a proactive, caring personal assistant for ${(profile?.fullName as string) || 'the user'}. You help them stay organized, productive, AND maintain a healthy work-life balance. You care about their wellbeing, not just productivity.
 
 CURRENT CONTEXT (${now.toLocaleString()}):
+- User's LOCAL date: ${today} (timezone: ${tz}) — use THIS for "today"/"tomorrow" calculations, NOT the server clock
+- Tomorrow's date: ${tomorrow} — when user says "schedule for tomorrow", use targetDate="${tomorrow}"
 - Time: ${timeOfDay} (${hour}:00)
 - Pending tasks: ${goals.length} (work: ${categoryBreakdown.work}, family: ${categoryBreakdown.family}, personal: ${categoryBreakdown.personal}, health: ${categoryBreakdown.health})
 - Balance: ${workPercent}% work ${isWorkHeavy ? '⚠️ TOO MUCH WORK' : '✓ OK'} | Family+Personal: ${familyPersonalPercent}% ${isLifeNeglected ? '⚠️ NEGLECTED' : '✓ OK'}
@@ -328,10 +340,11 @@ RULES:
           const endHour = (input.workHoursEnd as number) || 22;
           const pending = goals.filter(g => g.status === 'pending' || g.status === 'in_progress').sort((a, b) => b.priority - a.priority);
 
-          // Determine target date (supports "YYYY-MM-DD" for scheduling tomorrow etc.)
+          // Determine target date (supports "YYYY-MM-DD"). Falls back to client's local today.
+          const rawTarget = (input.targetDate as string) || today;
           let baseDate = new Date();
-          if (typeof input.targetDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.targetDate)) {
-            const [y, m, d] = (input.targetDate as string).split('-').map(Number);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(rawTarget)) {
+            const [y, m, d] = rawTarget.split('-').map(Number);
             baseDate = new Date(y, m - 1, d);
           }
 
