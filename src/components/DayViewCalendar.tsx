@@ -71,7 +71,9 @@ export default function DayViewCalendar({ date, tasks, onTaskClick, onSlotClick 
   const visibleTasks = useMemo(() => {
     return tasks.filter((t) => {
       if (!t.scheduledStart) return false;
-      return isSameDay(new Date(t.scheduledStart), date);
+      // Ensure scheduledStart is a Date object before comparison
+      const startDate = t.scheduledStart instanceof Date ? t.scheduledStart : new Date(t.scheduledStart);
+      return isSameDay(startDate, date);
     });
   }, [tasks, date]);
 
@@ -147,9 +149,9 @@ export default function DayViewCalendar({ date, tasks, onTaskClick, onSlotClick 
             )}
 
             {visibleTasks.map((task) => {
-              const start = new Date(task.scheduledStart!);
+              const start = task.scheduledStart instanceof Date ? task.scheduledStart : new Date(task.scheduledStart!);
               const end = task.scheduledEnd
-                ? new Date(task.scheduledEnd)
+                ? (task.scheduledEnd instanceof Date ? task.scheduledEnd : new Date(task.scheduledEnd))
                 : new Date(start.getTime() + (task.estimatedDuration || 30) * 60000);
               const colorClass = CATEGORY_COLORS[task.category] || 'bg-gray-500 text-white border-gray-600';
 
