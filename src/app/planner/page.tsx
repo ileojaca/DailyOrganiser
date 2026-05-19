@@ -1,12 +1,17 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import AppShell from '@/components/AppShell';
 import SmartTimeBlocking from '@/components/SmartTimeBlocking';
+import DayViewCalendar from '@/components/DayViewCalendar';
+import InlineTaskScheduler from '@/components/InlineTaskScheduler';
+import SmartSchedulingPanel from '@/components/SmartSchedulingPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTimeBlocks, TimeBlock } from '@/hooks/useTimeBlocks';
-import { useGoals } from '@/hooks/useGoals';
+import { useGoals, Goal } from '@/hooks/useGoals';
 import { useAccomplishmentLogs } from '@/hooks/useAccomplishmentLogs';
+import { useSleepAndEnergy } from '@/hooks/useSleepAndEnergy';
 import { detectBurnoutRisk } from '@/utils/productivityPrediction';
 import { AdaptiveScheduler } from '@/utils/adaptiveScheduler';
 
@@ -34,11 +39,22 @@ const EMPTY_FORM = {
   isProtected: false,
 };
 
+function formatDateLabel(date: Date): string {
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 export default function PlannerPage() {
   const { user } = useAuth();
   const { timeBlocks, loading, createTimeBlock, deleteTimeBlock } = useTimeBlocks(user?.uid);
-  const { goals, loading: goalsLoading } = useGoals(user?.uid);
+  const { goals, loading: goalsLoading, updateGoal } = useGoals(user?.uid);
   const { logs } = useAccomplishmentLogs(user?.uid);
+  const { sleep, energy } = useSleepAndEnergy(user?.uid);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -47,8 +63,14 @@ export default function PlannerPage() {
   const [scheduleInfo, setScheduleInfo] = useState<string>('');
   const [scheduledCount, setScheduledCount] = useState(0);
   const [unscheduledCount, setUnscheduledCount] = useState(0);
+  const [dayViewActive, setDayViewActive] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
 
-  // Calculate overload detection
   const scheduledTasks = goals
     .filter(g => g.scheduledStart)
     .map(g => ({
@@ -97,16 +119,9 @@ export default function PlannerPage() {
     }
   };
 
-  // Group blocks by day
   const blocksByDay = DAYS.map((_, dayIdx) =>
     timeBlocks.filter((b) => b.daysOfWeek.includes(dayIdx))
   );
-
-  const formatTime = (date: Date) => {
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  };
 
   const autoScheduleGoals = async () => {
     if (!goals || goals.length === 0) {
@@ -155,27 +170,22 @@ export default function PlannerPage() {
       preferredWorkHours: { start: 9, end: 17 },
     });
 
+    const suggestions = plan.scheduledTasks.map((item) => ({
+      goalId: item.task.id,
+      scheduledStart: item.startTime,
+      scheduledEnd: item.endTime,
+    }));
+
     let scheduled = 0;
-    for (const item of plan.scheduledTasks) {
-      const goal = pendingGoals.find((g) => g.id === item.task.id);
-      if (!goal) continue;
-      const startTime = item.startTime;
-      const endTime = item.endTime;
-      const energyLevel = (goal.energyRequired && goal.energyRequired >= 7 ? 'high' : goal.energyRequired && goal.energyRequired >= 4 ? 'medium' : 'low') as 'high' | 'medium' | 'low';
-      const blockInput = {
-        name: `${goal.title} (AI)`,
-        blockType: 'flexible' as const,
-        startTime: formatTime(startTime),
-        endTime: formatTime(endTime),
-        daysOfWeek: [startTime.getDay()],
-        energyLevel,
-        isProtected: false,
-      };
+    for (const suggestion of suggestions) {
       try {
-        await createTimeBlock(blockInput);
+        await updateGoal(suggestion.goalId, {
+          scheduledStart: suggestion.scheduledStart,
+          scheduledEnd: suggestion.scheduledEnd,
+        });
         scheduled += 1;
       } catch (error) {
-        console.error('Failed to create AI time block', blockInput, error);
+        console.error('Failed to schedule goal', suggestion, error);
       }
     }
 
@@ -187,10 +197,20 @@ export default function PlannerPage() {
     setScheduling(false);
   };
 
+  const handleInlineSchedule = async (task: Goal, scheduledStart: Date, scheduledEnd: Date) => {
+    try {
+      await updateGoal(task.id, { scheduledStart, scheduledEnd });
+    } catch (error) {
+      console.error('Failed to schedule task', error);
+    }
+    setSchedulingTaskId(null);
+  };
+
+  const pendingGoals = goals.filter((g) => g.status !== 'completed' && g.status !== 'cancelled');
+
   return (
     <AppShell>
       <div className="p-6 max-w-7xl mx-auto space-y-6">
-        {/* Overload Warning */}
         {burnoutRisk.riskLevel !== 'low' && (
           <div className={`p-4 rounded-lg border ${
             burnoutRisk.riskLevel === 'critical' ? 'bg-red-50 border-red-200' :
@@ -241,53 +261,145 @@ export default function PlannerPage() {
           </div>
         )}
 
-        {/* Smart Time Blocking */}
         <SmartTimeBlocking />
 
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Weekly Planner</h1>
             <p className="text-gray-500 text-sm mt-1">Manage your time blocks and schedule</p>
           </div>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Time Block
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDayViewActive((v) => !v)}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                dayViewActive
+                  ? 'bg-indigo-600 text-white border-indigo-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Day View
+            </button>
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Time Block
+            </button>
+          </div>
         </div>
 
-        {/* Help banner */}
+        {dayViewActive && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSelectedDate((d) => addDays(d, -1))}
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-sm font-medium text-gray-900 min-w-[160px] text-center">
+                {formatDateLabel(selectedDate)}
+              </span>
+              <button
+                onClick={() => setSelectedDate((d) => addDays(d, 1))}
+                className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => {
+                  const d = new Date();
+                  d.setHours(0, 0, 0, 0);
+                  setSelectedDate(d);
+                }}
+                className="px-2.5 py-1 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+              >
+                Today
+              </button>
+            </div>
+            <DayViewCalendar
+              date={selectedDate}
+              tasks={goals}
+              onTaskClick={(task) => setSchedulingTaskId(task.id)}
+              onSlotClick={(hour, minute) => {
+                console.log('Slot clicked', hour, minute);
+              }}
+            />
+          </div>
+        )}
+
         {timeBlocks.length === 0 && (
           <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
             <p className="text-sm text-amber-800"><strong>📅 How it works:</strong> Create time blocks (e.g., "Focus Time", "Team Meetings") and assign them to days. These help organize your week and sync with your goals.</p>
           </div>
         )}
 
-        {/* AI auto schedule section */}
-        <div className="bg-green-50 rounded-xl border border-green-200 p-4 mb-4">
-          <p className="text-sm text-green-700">Use AI Auto-Schedule to map your current goals into this week’s calendar.</p>
-          <div className="mt-3 flex gap-2 items-center">
-            <button
-              onClick={autoScheduleGoals}
-              disabled={scheduling || (goalsLoading && loading)}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40"
-            >
-              {scheduling ? 'Scheduling...' : 'AI Auto-Schedule Goals'}
-            </button>
-            <span className="text-xs text-gray-600">
-              {scheduledCount > 0 && `Scheduled: ${scheduledCount}`}
-              {unscheduledCount > 0 && ` | Unscheduled: ${unscheduledCount}`}
-            </span>
-          </div>
-          {scheduleInfo && <p className="text-xs mt-2 text-green-800">{scheduleInfo}</p>}
+        <div className="mb-4">
+          <SmartSchedulingPanel
+            tasks={pendingGoals}
+            currentEnergy={energy.currentLevel}
+            sleepHours={sleep.lastNightHours}
+            workLifeBalance={{ work: 40, personal: 30, health: 15, learning: 15 }}
+            onScheduleGenerated={(schedule) => {
+              if (schedule.schedule.length > 0) {
+                setScheduleInfo(`Generated optimal schedule for ${schedule.schedule.length} tasks`);
+              }
+            }}
+          />
         </div>
 
-        {/* Add form */}
+        {pendingGoals.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h2 className="text-sm font-semibold text-gray-900">Unscheduled Goals</h2>
+            </div>
+            <ul className="divide-y divide-gray-100">
+              {pendingGoals.map((goal) => (
+                <li key={goal.id} className="px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{goal.title}</p>
+                      {goal.scheduledStart && (
+                        <p className="text-xs text-indigo-600 mt-0.5">
+                          {new Date(goal.scheduledStart).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}{' '}
+                          {new Date(goal.scheduledStart).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setSchedulingTaskId(schedulingTaskId === goal.id ? null : goal.id)}
+                      className={`flex-shrink-0 px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                        schedulingTaskId === goal.id
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'text-indigo-600 border-indigo-200 hover:bg-indigo-50'
+                      }`}
+                    >
+                      {goal.scheduledStart ? 'Reschedule' : 'Schedule'}
+                    </button>
+                  </div>
+                  {schedulingTaskId === goal.id && (
+                    <InlineTaskScheduler
+                      task={goal}
+                      onSchedule={(start, end) => handleInlineSchedule(goal, start, end)}
+                      onCancel={() => setSchedulingTaskId(null)}
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {showForm && (
           <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <h2 className="text-base font-semibold text-gray-900 mb-4">New Time Block</h2>
@@ -398,7 +510,6 @@ export default function PlannerPage() {
           </div>
         )}
 
-        {/* Weekly grid */}
         {loading ? (
           <div className="grid grid-cols-7 gap-3">
             {DAYS.map((day) => (
@@ -458,7 +569,6 @@ export default function PlannerPage() {
           </div>
         )}
 
-        {/* Legend */}
         <div className="flex items-center gap-4 text-xs text-gray-500">
           <span className="font-medium">Block types:</span>
           {Object.entries({ fixed: 'Fixed', flexible: 'Flexible', protected: 'Protected' }).map(([type, label]) => (

@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,6 +35,14 @@ export default function SettingsPage() {
     preferences: { notifications: true, reminders: true, suggestionAlerts: true },
   });
 
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    morningBriefingTime: '08:00',
+    eveningReviewTime: '19:00',
+    reminderLeadTime: '30 minutes before',
+    pushNotifications: true,
+    emailNotifications: false,
+  });
+
   useEffect(() => {
     if (profile) {
       const p = profile as any;
@@ -46,6 +55,15 @@ export default function SettingsPage() {
         energyPattern: profile.energyPattern || { peakHours: ['09:00-11:00', '15:00-17:00'], lowHours: ['13:00-14:00'] },
         preferences: profile.preferences || { notifications: true, reminders: true, suggestionAlerts: true },
       });
+      if (p.notificationPrefs) {
+        setNotificationPrefs({
+          morningBriefingTime: p.notificationPrefs.morningBriefingTime || '08:00',
+          eveningReviewTime: p.notificationPrefs.eveningReviewTime || '19:00',
+          reminderLeadTime: p.notificationPrefs.reminderLeadTime || '30 minutes before',
+          pushNotifications: p.notificationPrefs.pushNotifications ?? true,
+          emailNotifications: p.notificationPrefs.emailNotifications ?? false,
+        });
+      }
     }
   }, [profile]);
 
@@ -66,7 +84,7 @@ export default function SettingsPage() {
     setSaving(true);
     setMessage(null);
     try {
-      await updateProfile(formData);
+      await updateProfile({ ...formData, notificationPrefs } as any);
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' });
@@ -265,22 +283,14 @@ export default function SettingsPage() {
                 <p className="text-sm text-gray-500 dark:text-gray-400">Receive push notifications for reminders</p>
               </div>
               <button
-                onClick={() =>
-                  setFormData({
-                    ...formData,
-                    preferences: {
-                      ...formData.preferences!,
-                      notifications: !formData.preferences?.notifications,
-                    },
-                  })
-                }
+                onClick={() => setNotificationPrefs({ ...notificationPrefs, pushNotifications: !notificationPrefs.pushNotifications })}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  formData.preferences?.notifications ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'
+                  notificationPrefs.pushNotifications ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'
                 }`}
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    formData.preferences?.notifications ? 'translate-x-6' : 'translate-x-1'
+                    notificationPrefs.pushNotifications ? 'translate-x-6' : 'translate-x-1'
                   }`}
                 />
               </button>
@@ -338,6 +348,67 @@ export default function SettingsPage() {
                   }`}
                 />
               </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white">Email Notifications</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Receive summaries and alerts via email</p>
+              </div>
+              <button
+                onClick={() => setNotificationPrefs({ ...notificationPrefs, emailNotifications: !notificationPrefs.emailNotifications })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  notificationPrefs.emailNotifications ? 'bg-indigo-600' : 'bg-gray-200 dark:bg-gray-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    notificationPrefs.emailNotifications ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Morning briefing time
+                </label>
+                <input
+                  type="time"
+                  value={notificationPrefs.morningBriefingTime}
+                  onChange={(e) => setNotificationPrefs({ ...notificationPrefs, morningBriefingTime: e.target.value })}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Evening review time
+                </label>
+                <input
+                  type="time"
+                  value={notificationPrefs.eveningReviewTime}
+                  onChange={(e) => setNotificationPrefs({ ...notificationPrefs, eveningReviewTime: e.target.value })}
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Reminder lead time
+                </label>
+                <select
+                  value={notificationPrefs.reminderLeadTime}
+                  onChange={(e) => setNotificationPrefs({ ...notificationPrefs, reminderLeadTime: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="15 minutes before">15 minutes before</option>
+                  <option value="30 minutes before">30 minutes before</option>
+                  <option value="1 hour before">1 hour before</option>
+                  <option value="2 hours before">2 hours before</option>
+                </select>
+              </div>
             </div>
 
             <button
