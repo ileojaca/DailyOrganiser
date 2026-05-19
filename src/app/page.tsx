@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle, AlertTriangle, Info, Target, Clock, Briefcase, Star, Activity,
@@ -16,6 +16,8 @@ import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useSleepAndEnergy } from '@/hooks/useSleepAndEnergy';
 import { scheduleTaskReminder } from '@/lib/notificationScheduler';
+import { getDb } from '@/lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Normal', 3: 'Medium', 4: 'High', 5: 'Critical' };
 
@@ -139,6 +141,9 @@ export default function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [sleepHours, setSleepHours] = useState<number>(7);
   const [savingSleep, setSavingSleep] = useState(false);
+  const [gamification, setGamification] = useState<{ totalPoints: number; currentStreak: number; level: number; achievements: Array<{ name: string; icon: string }> }>({ totalPoints: 0, currentStreak: 0, level: 0, achievements: [] });
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   const hour = new Date().getHours();
   const name = profile?.fullName?.split(' ')[0] || 'there';
@@ -257,6 +262,50 @@ export default function Home() {
     const neverShow = localStorage.getItem('dailyOrganiserNeverShowOnboarding') === 'true';
     if (!neverShow && goals.length === 0) setShowOnboarding(true);
   }, [goals.length]);
+
+  // Fetch AI suggestions once when tasks are loaded
+  const fetchSuggestions = useCallback(async () => {
+    if (!user || goals.length === 0 || aiSuggestions.length > 0) return;
+    setLoadingSuggestions(true);
+    try {
+      const token = await user.getIdToken();
+      const res = await fetch('/api/insights?type=suggestions', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const tips: string[] = data.suggestions || data.insights?.suggestions || [];
+        if (tips.length) setAiSuggestions(tips.slice(0, 3));
+      }
+    } catch {
+      // suggestions are optional, fail silently
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, [user, goals.length, aiSuggestions.length]);
+
+  useEffect(() => {
+    fetchSuggestions();
+  }, [fetchSuggestions]);
+
+  // Subscribe to gamification data
+  useEffect(() => {
+    if (!user) return;
+    const db = getDb();
+    const ref = doc(db, 'users', user.uid, 'gamification', 'data');
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setGamification({
+          totalPoints: d.totalPoints || 0,
+          currentStreak: d.currentStreak || 0,
+          level: d.level || 0,
+          achievements: d.achievements || [],
+        });
+      }
+    });
+    return () => unsub();
+  }, [user]);
 
   const completeOnboarding = () => {
     setShowOnboarding(false);
@@ -409,7 +458,21 @@ export default function Home() {
             {completedToday.length > 0 && (
               <div className="flex-shrink-0 flex items-center gap-1.5 bg-green-50 border border-green-100 dark:bg-green-900/20 dark:border-green-900 rounded-full px-3 py-2 shadow-sm">
                 <span className="text-sm font-bold text-green-600 dark:text-green-400">{completedToday.length}</span>
-                <span className="text-xs text-green-600 dark:text-green-400">completed</span>
+                <span className="text-xs text-green-600 dark:text-green-400">done today</span>
+              </div>
+            )}
+            {gamification.currentStreak > 0 && (
+              <div className="flex-shrink-0 flex items-center gap-1.5 bg-orange-50 border border-orange-100 dark:bg-orange-900/20 dark:border-orange-900 rounded-full px-3 py-2 shadow-sm" title="Day streak">
+                <span className="text-base">🔥</span>
+                <span className="text-sm font-bold text-orange-600 dark:text-orange-400">{gamification.currentStreak}</span>
+                <span className="text-xs text-orange-600 dark:text-orange-400">streak</span>
+              </div>
+            )}
+            {gamification.totalPoints > 0 && (
+              <div className="flex-shrink-0 flex items-center gap-1.5 bg-yellow-50 border border-yellow-100 dark:bg-yellow-900/20 dark:border-yellow-900 rounded-full px-3 py-2 shadow-sm" title={`Level ${gamification.level}`}>
+                <span className="text-base">⭐</span>
+                <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{gamification.totalPoints}</span>
+                <span className="text-xs text-yellow-600 dark:text-yellow-400">pts</span>
               </div>
             )}
           </div>
@@ -563,6 +626,36 @@ export default function Home() {
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-3 text-center">{completedWeek.length} tasks completed</p>
             </div>
           )}
+
+          {/* AI Insights card */}
+          <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-1.5">
+                <Bot className="w-4 h-4" style={{ color: 'var(--accent-color)' }} />
+                AI Insights
+              </h3>
+              <Link href="/assistant" className="text-xs font-medium" style={{ color: 'var(--accent-color)' }}>Chat →</Link>
+            </div>
+            {loadingSuggestions ? (
+              <div className="space-y-2">
+                {[1,2,3].map(i => <div key={i} className="h-4 bg-gray-100 dark:bg-gray-700 rounded animate-pulse" />)}
+              </div>
+            ) : aiSuggestions.length > 0 ? (
+              <ul className="space-y-2">
+                {aiSuggestions.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
+                    <span className="mt-0.5 w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 text-white text-[10px] font-bold" style={{ background: 'var(--accent-color)' }}>{i + 1}</span>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-center py-2">
+                <p className="text-xs text-gray-400 mb-2">Ask the AI to analyse your schedule</p>
+                <Link href="/assistant" className="text-xs font-medium px-3 py-1.5 rounded-lg text-white inline-block" style={{ background: 'var(--accent-color)' }}>Open Assistant</Link>
+              </div>
+            )}
+          </div>
 
           <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Navigation</h3>

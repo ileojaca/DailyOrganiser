@@ -25,6 +25,8 @@ interface UserProfile {
   energyPattern: { peakHours: string[]; lowHours: string[] };
   preferences: { notifications: boolean; reminders: boolean; suggestionAlerts: boolean };
   subscription_tier?: string;
+  onboardingCompleted?: boolean;
+  focusPeak?: string;
   createdAt: Date;
   updatedAt: Date;
 }
