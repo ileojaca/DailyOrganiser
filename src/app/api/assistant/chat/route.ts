@@ -188,26 +188,45 @@ export async function POST(request: NextRequest) {
     const avgSleep = sleep.length > 0 ? sleep.reduce((s, r) => s + ((r.duration as number) || 7), 0) / sleep.length : 7;
     const currentEnergy = energy.length > 0 ? (energy[0].level as number) : 5;
 
-    const systemPrompt = `You are a proactive, caring personal assistant for ${(profile?.fullName as string) || 'the user'}. You help them stay organized, productive, and balanced.
+    const categoryBreakdown = {
+      work: goals.filter(g => g.category === 'work').length,
+      personal: goals.filter(g => g.category === 'personal').length,
+      health: goals.filter(g => g.category === 'health').length,
+      learning: goals.filter(g => g.category === 'learning').length,
+      social: goals.filter(g => g.category === 'social').length,
+      family: goals.filter(g => g.category === 'family').length,
+    };
+    const workPercent = goals.length > 0 ? Math.round((categoryBreakdown.work / goals.length) * 100) : 0;
+    const isWorkHeavy = workPercent > 60;
+
+    const systemPrompt = `You are a proactive, caring personal assistant for ${(profile?.fullName as string) || 'the user'}. You help them stay organized, productive, AND maintain work-life balance.
 
 CURRENT CONTEXT (${now.toLocaleString()}):
 - Time: ${timeOfDay} (${hour}:00)
-- Pending tasks: ${goals.length} total, ${overdueTasks.length} OVERDUE, ${todayTasks.length} due today
-- Top priority task: ${goals.sort((a,b) => b.priority - a.priority)[0]?.title || 'none'}
-- Recent sleep: ${avgSleep.toFixed(1)} hours average
-- Current energy: ${currentEnergy}/10
-- Overdue tasks: ${overdueTasks.map(g => g.title).join(', ') || 'none'}
+- Pending tasks: ${goals.length} total (${categoryBreakdown.work} work, ${categoryBreakdown.family} family, ${categoryBreakdown.personal} personal, ${categoryBreakdown.health} health, ${categoryBreakdown.learning} learning, ${categoryBreakdown.social} social)
+- Balance: ${workPercent}% work ${isWorkHeavy ? '⚠️ SKEWED' : '✓ OK'}
+- Overdue: ${overdueTasks.length} | Due today: ${todayTasks.length}
+- Sleep: ${avgSleep.toFixed(1)}h | Energy: ${currentEnergy}/10
+- Top priority: ${goals.sort((a,b) => b.priority - a.priority)[0]?.title || 'none'}
 
-PENDING TASKS:
+BALANCE RULES:
+- Ideal: 30-40% work, 20% family, 20% personal, 10% health, 10% learning, 10% social
+- If work > 60%, suggest adding family, personal, or health tasks
+- Never plan only work tasks
+- Warn about burnout if 3+ work tasks scheduled without breaks
+
+PENDING TASKS (first 10):
 ${goals.slice(0, 10).map(g => `- [P${g.priority}] ${g.title} (${g.category}) ${toDate(g.deadline) ? `due ${toDate(g.deadline)!.toLocaleDateString()}` : ''}`).join('\n')}
 
-YOUR STYLE: Warm, direct, practical. Always specific — name actual tasks, not generic advice. Offer to DO things, not just advise. Be brief but complete.
+YOUR STYLE: Warm, direct, practical. Always specific. Offer to DO things, not advise. Be brief.
 
 RULES:
 - If user says "plan my day", call schedule_day tool
 - If user says "add [task]", call create_task immediately
-- If overdue tasks exist, mention them first
-- If energy < 4, suggest lighter work`;
+- Mention overdue tasks first
+- If energy < 4, suggest lighter work
+- If work-heavy, proactively suggest balance
+- Warn when planning if schedule looks unhealthy`;
 
     const messages: Anthropic.Messages.MessageParam[] = [
       ...conversationHistory.slice(-10),
