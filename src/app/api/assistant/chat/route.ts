@@ -13,6 +13,7 @@ interface GoalData {
   estimatedDuration?: number;
 }
 
+// Tools defined in Anthropic format (used directly with Anthropic SDK)
 const TOOLS: Anthropic.Messages.Tool[] = [
   {
     name: 'create_task',
@@ -31,7 +32,7 @@ const TOOLS: Anthropic.Messages.Tool[] = [
   },
   {
     name: 'schedule_day',
-    description: 'Auto-schedule all pending tasks for today using intelligent scheduling',
+    description: 'Auto-schedule all pending tasks for today',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -53,19 +54,6 @@ const TOOLS: Anthropic.Messages.Tool[] = [
     },
   },
   {
-    name: 'reschedule_task',
-    description: 'Reschedule a task to a new time',
-    input_schema: {
-      type: 'object' as const,
-      properties: {
-        taskId: { type: 'string', description: 'The task ID' },
-        scheduledStart: { type: 'string', description: 'ISO datetime string' },
-        durationMinutes: { type: 'number', description: 'Duration in minutes' },
-      },
-      required: ['taskId', 'scheduledStart', 'durationMinutes'],
-    },
-  },
-  {
     name: 'get_productivity_summary',
     description: 'Get a summary of user productivity and insights',
     input_schema: {
@@ -78,14 +66,75 @@ const TOOLS: Anthropic.Messages.Tool[] = [
   },
 ];
 
+// Convert Anthropic tools to OpenAI function-calling format for OpenRouter
+const OPENAI_TOOLS = TOOLS.map(t => ({
+  type: 'function' as const,
+  function: {
+    name: t.name,
+    description: t.description,
+    parameters: t.input_schema,
+  },
+}));
+
+// Normalized tool call result shared by both API paths
+interface ToolBlock {
+  name: string;
+  input: Record<string, unknown>;
+}
+
+// Call OpenRouter using OpenAI-compatible REST API
+async function callOpenRouter(
+  apiKey: string,
+  systemPrompt: string,
+  messages: Anthropic.Messages.MessageParam[]
+): Promise<{ text: string; toolBlocks: ToolBlock[] }> {
+  const openaiMessages = [
+    { role: 'system', content: systemPrompt },
+    ...messages.map(m => ({
+      role: m.role,
+      content: typeof m.content === 'string' ? m.content : 
+        Array.isArray(m.content) ? m.content.find((b: {type: string}) => b.type === 'text')?.text || '' : '',
+    })),
+  ];
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://daily-organiser.vercel.app',
+      'X-Title': 'DailyOrganiser',
+    },
+    body: JSON.stringify({
+      model: 'anthropic/claude-3.5-haiku',
+      max_tokens: 1024,
+      messages: openaiMessages,
+      tools: OPENAI_TOOLS,
+      tool_choice: 'auto',
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`OpenRouter error ${res.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  const choice = data.choices?.[0]?.message;
+  const text: string = choice?.content || '';
+  const toolBlocks: ToolBlock[] = (choice?.tool_calls || []).map((tc: {function: {name: string; arguments: string}}) => ({
+    name: tc.function.name,
+    input: JSON.parse(tc.function.arguments || '{}'),
+  }));
+
+  return { text, toolBlocks };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const uid = await verifyAuthToken(request);
     if (!uid) {
-      return NextResponse.json(
-        { error: 'Unauthorized - please sign in. Add FIREBASE_SERVICE_ACCOUNT_JSON to enable full auth verification.' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized — please sign in.' }, { status: 401 });
     }
 
     const anthropicKey = process.env.ANTHROPIC_API_KEY;
@@ -97,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     const { message, conversationHistory = [] } = await request.json();
 
-    // Load user context from Firestore — gracefully degrade if unavailable
+    // Load user context — fail gracefully if Firestore unavailable
     let goals: GoalData[] = [];
     let sleep: Record<string, unknown>[] = [];
     let energy: Record<string, unknown>[] = [];
@@ -130,7 +179,6 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const hour = now.getHours();
     const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
-
     const today = now.toISOString().split('T')[0];
     const overdueTasks = goals.filter(g => { const d = toDate(g.deadline); return d && d < now; });
     const todayTasks = goals.filter(g => {
@@ -140,7 +188,7 @@ export async function POST(request: NextRequest) {
     const avgSleep = sleep.length > 0 ? sleep.reduce((s, r) => s + ((r.duration as number) || 7), 0) / sleep.length : 7;
     const currentEnergy = energy.length > 0 ? (energy[0].level as number) : 5;
 
-    const systemPrompt = `You are a proactive, caring personal assistant for ${(profile?.fullName as string) || 'the user'}. You know everything about their life and help them stay organized, productive, and balanced.
+    const systemPrompt = `You are a proactive, caring personal assistant for ${(profile?.fullName as string) || 'the user'}. You help them stay organized, productive, and balanced.
 
 CURRENT CONTEXT (${now.toLocaleString()}):
 - Time: ${timeOfDay} (${hour}:00)
@@ -153,59 +201,48 @@ CURRENT CONTEXT (${now.toLocaleString()}):
 PENDING TASKS:
 ${goals.slice(0, 10).map(g => `- [P${g.priority}] ${g.title} (${g.category}) ${toDate(g.deadline) ? `due ${toDate(g.deadline)!.toLocaleDateString()}` : ''}`).join('\n')}
 
-YOUR PERSONALITY:
-- Warm, direct, and practical — like a trusted personal assistant
-- Always specific: name the actual task, not generic advice
-- Proactive: if you see problems, call them out
-- Action-oriented: offer to DO things, not just advise
-- Brief but complete: get to the point fast, be thorough when needed
+YOUR STYLE: Warm, direct, practical. Always specific — name actual tasks, not generic advice. Offer to DO things, not just advise. Be brief but complete.
 
 RULES:
-- If user says "plan my day" or "schedule everything", call schedule_day tool
-- If user says "add [task]", call create_task tool immediately
-- If user asks what to focus on, name the specific highest-priority task
-- If overdue tasks exist, always mention them first
-- If energy is low (< 4), suggest lighter work and breaks
-- If it's evening, suggest winding down and reviewing tomorrow
-- Use tools liberally — actually DO things, don't just talk about them`;
+- If user says "plan my day", call schedule_day tool
+- If user says "add [task]", call create_task immediately
+- If overdue tasks exist, mention them first
+- If energy < 4, suggest lighter work`;
 
-    const client = anthropicKey
-      ? new Anthropic({ apiKey: anthropicKey })
-      : new Anthropic({
-          apiKey: openrouterKey!,
-          baseURL: 'https://openrouter.ai/api/v1',
-          defaultHeaders: {
-            'HTTP-Referer': 'https://daily-organiser.vercel.app',
-            'X-Title': 'DailyOrganiser',
-          },
-        });
-
-    const model = anthropicKey ? 'claude-haiku-4-5-20251001' : 'claude-3-5-haiku';
-
-    const recentHistory = conversationHistory.slice(-10);
     const messages: Anthropic.Messages.MessageParam[] = [
-      ...recentHistory,
+      ...conversationHistory.slice(-10),
       { role: 'user', content: message },
     ];
 
-    const response = await client.messages.create({
-      model,
-      max_tokens: 1024,
-      system: systemPrompt,
-      tools: TOOLS,
-      messages,
-    });
+    // Call the AI
+    let responseText = '';
+    let toolBlocks: ToolBlock[] = [];
 
+    if (anthropicKey) {
+      const client = new Anthropic({ apiKey: anthropicKey });
+      const response = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools: TOOLS,
+        messages,
+      });
+      const textBlock = response.content.find(b => b.type === 'text');
+      responseText = textBlock?.type === 'text' ? textBlock.text : '';
+      toolBlocks = response.content
+        .filter(b => b.type === 'tool_use')
+        .map(b => b.type === 'tool_use' ? { name: b.name, input: b.input as Record<string, unknown> } : { name: '', input: {} });
+    } else {
+      const result = await callOpenRouter(openrouterKey!, systemPrompt, messages);
+      responseText = result.text;
+      toolBlocks = result.toolBlocks;
+    }
+
+    // Execute tool calls
     const toolResults: Array<{ toolName: string; result: string; data?: unknown }> = [];
 
-    // Only run tool actions if we have Firestore access
-    const hasDb = goals.length > 0 || profile !== undefined;
-
-    for (const block of response.content) {
-      if (block.type !== 'tool_use') continue;
-
-      const input = block.input as Record<string, unknown>;
-
+    for (const block of toolBlocks) {
+      const input = block.input;
       try {
         const db = getAdminDb();
 
@@ -224,104 +261,68 @@ RULES:
             updatedAt: FieldValue.serverTimestamp(),
           };
           const ref = await db.collection('users').doc(uid).collection('goals').add(taskData);
-          toolResults.push({ toolName: 'create_task', result: `Task "${input.title}" created`, data: { id: ref.id, title: input.title } });
+          toolResults.push({ toolName: 'create_task', result: `Task "${input.title}" created`, data: { id: ref.id } });
         }
 
         if (block.name === 'schedule_day') {
           const startHour = (input.workHoursStart as number) || 8;
           const endHour = (input.workHoursEnd as number) || 18;
-          const pendingGoals = goals.filter(g => g.status === 'pending' || g.status === 'in_progress');
-          const sortedByPriority = pendingGoals.sort((a, b) => b.priority - a.priority);
-
+          const pending = goals.filter(g => g.status === 'pending' || g.status === 'in_progress').sort((a, b) => b.priority - a.priority);
           let currentTime = new Date();
           currentTime.setHours(startHour, 0, 0, 0);
           if (currentTime.getTime() < Date.now()) {
             currentTime = new Date();
             currentTime.setMinutes(Math.ceil(currentTime.getMinutes() / 30) * 30, 0, 0);
           }
-
-          const endTime = new Date();
-          endTime.setHours(endHour, 0, 0, 0);
-
+          const endTime = new Date(); endTime.setHours(endHour, 0, 0, 0);
           let scheduled = 0;
-          for (const task of sortedByPriority.slice(0, 8)) {
+          for (const task of pending.slice(0, 8)) {
             const duration = (task.estimatedDuration as number) || 60;
-            const taskEnd = new Date(currentTime.getTime() + duration * 60 * 1000);
+            const taskEnd = new Date(currentTime.getTime() + duration * 60000);
             if (taskEnd > endTime) break;
-            await db.collection('users').doc(uid).collection('goals').doc(task.id as string).update({
-              scheduledStart: currentTime,
-              scheduledEnd: taskEnd,
-              updatedAt: FieldValue.serverTimestamp(),
+            await db.collection('users').doc(uid).collection('goals').doc(task.id).update({
+              scheduledStart: currentTime, scheduledEnd: taskEnd, updatedAt: FieldValue.serverTimestamp(),
             });
-            currentTime = new Date(taskEnd.getTime() + 15 * 60 * 1000);
+            currentTime = new Date(taskEnd.getTime() + 15 * 60000);
             scheduled++;
           }
-          toolResults.push({ toolName: 'schedule_day', result: `Scheduled ${scheduled} tasks for today`, data: { scheduled } });
+          toolResults.push({ toolName: 'schedule_day', result: `Scheduled ${scheduled} tasks for today` });
         }
 
         if (block.name === 'complete_task') {
           await db.collection('users').doc(uid).collection('goals').doc(input.taskId as string).update({
-            status: 'completed',
-            completedAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
+            status: 'completed', completedAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
           });
           toolResults.push({ toolName: 'complete_task', result: 'Task marked as completed' });
         }
 
-        if (block.name === 'reschedule_task') {
-          const start = new Date(input.scheduledStart as string);
-          const end = new Date(start.getTime() + (input.durationMinutes as number) * 60 * 1000);
-          await db.collection('users').doc(uid).collection('goals').doc(input.taskId as string).update({
-            scheduledStart: start,
-            scheduledEnd: end,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-          toolResults.push({ toolName: 'reschedule_task', result: `Task rescheduled to ${start.toLocaleTimeString()}` });
-        }
-
         if (block.name === 'get_productivity_summary') {
-          const completedToday = (await db.collection('users').doc(uid).collection('goals')
-            .where('status', '==', 'completed').limit(10).get()).docs.length;
-          toolResults.push({
-            toolName: 'get_productivity_summary',
-            result: `${completedToday} tasks completed, ${goals.length} pending, ${overdueTasks.length} overdue`,
-          });
+          const completedCount = (await db.collection('users').doc(uid).collection('goals').where('status', '==', 'completed').limit(10).get()).docs.length;
+          toolResults.push({ toolName: 'get_productivity_summary', result: `${completedCount} completed, ${goals.length} pending, ${overdueTasks.length} overdue` });
         }
       } catch (toolErr) {
         console.error(`Tool ${block.name} failed:`, toolErr);
-        toolResults.push({ toolName: block.name, result: 'Action could not be completed — please try again.' });
+        toolResults.push({ toolName: block.name, result: 'Action could not be completed.' });
       }
     }
 
-    const textContent = response.content.find(b => b.type === 'text');
-    const responseText = textContent?.type === 'text' ? textContent.text : '';
-
-    // Save chat history — non-critical, ignore failures
+    // Save chat history (non-critical)
     try {
       const db = getAdminDb();
-      const chatRef = db.collection('users').doc(uid).collection('aiChats').doc(today);
-      await chatRef.set({
+      await db.collection('users').doc(uid).collection('aiChats').doc(today).set({
         messages: FieldValue.arrayUnion(
           { role: 'user', content: message, timestamp: now.toISOString() },
           { role: 'assistant', content: responseText, timestamp: new Date().toISOString(), toolResults }
         ),
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true });
-    } catch {
-      // Non-critical — chat history not saved
-    }
+    } catch { /* non-critical */ }
 
-    return NextResponse.json({
-      response: responseText,
-      toolResults,
-      stopReason: response.stop_reason,
-    });
+    return NextResponse.json({ response: responseText, toolResults });
 
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error('Chat API error:', errorMsg, error);
-    return NextResponse.json({
-      error: `Something went wrong: ${errorMsg}`
-    }, { status: 500 });
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('Chat API error:', msg);
+    return NextResponse.json({ error: `Failed: ${msg.slice(0, 300)}` }, { status: 500 });
   }
 }
