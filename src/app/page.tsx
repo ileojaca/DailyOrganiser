@@ -3,6 +3,11 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import {
+  AlertCircle, AlertTriangle, Info, Award, Target, Sunrise, Coffee, Clock,
+  Briefcase, Star, Activity, BookOpen, Users, Heart,
+  FileText, Timer, Bot, Moon, Flame, CheckSquare, Calendar, ChevronRight,
+} from 'lucide-react';
 import AppShell from '@/components/AppShell';
 import OnboardingFlow from '@/components/OnboardingFlow';
 import LandingPage from '@/components/LandingPage';
@@ -13,7 +18,19 @@ import { useGamification } from '@/hooks/useGamification';
 import { useSleepAndEnergy } from '@/hooks/useSleepAndEnergy';
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Normal', 3: 'Medium', 4: 'High', 5: 'Critical' };
-const CATEGORY_EMOJI: Record<string, string> = { work: '💼', personal: '⭐', health: '🏃', learning: '📚', social: '👥', family: '👨‍👩‍👧' };
+
+function CategoryIcon({ category }: { category: string }) {
+  const cls = 'w-3 h-3 inline-block';
+  switch (category) {
+    case 'work': return <Briefcase className={cls} />;
+    case 'personal': return <Star className={cls} />;
+    case 'health': return <Activity className={cls} />;
+    case 'learning': return <BookOpen className={cls} />;
+    case 'social': return <Users className={cls} />;
+    case 'family': return <Heart className={cls} />;
+    default: return <FileText className={cls} />;
+  }
+}
 
 function priorityBarColor(priority: number): string {
   if (priority >= 5) return 'bg-red-500';
@@ -50,60 +67,52 @@ interface SmartMessageContext {
   completedToday: number;
 }
 
-function getSmartMessage(context: SmartMessageContext): { headline: string; detail: string; emoji: string; urgency: 'normal' | 'warning' | 'critical' } {
+function getSmartMessage(context: SmartMessageContext): { headline: string; detail: string; urgency: 'normal' | 'warning' | 'critical' } {
   const { hour, overdueTasks, dueTodayTasks, topTask, completedToday } = context;
 
   if (overdueTasks.length >= 3) return {
-    emoji: '🚨',
     headline: `${overdueTasks.length} tasks are overdue`,
     detail: `Start with "${overdueTasks[0]?.title}" right now — it's most overdue.`,
     urgency: 'critical',
   };
 
   if (overdueTasks.length > 0) return {
-    emoji: '⚠️',
     headline: `"${overdueTasks[0]?.title}" is overdue`,
     detail: `Complete it before taking on new work today.`,
     urgency: 'warning',
   };
 
   if (hour < 10 && topTask) return {
-    emoji: '🌅',
     headline: `Morning focus: ${topTask.title}`,
     detail: `Your energy is at its peak now. Tackle your top priority first.`,
     urgency: 'normal',
   };
 
   if (hour >= 12 && hour < 14) return {
-    emoji: '🍽️',
     headline: completedToday > 0 ? `${completedToday} done — enjoy lunch!` : 'Take a proper lunch break',
     detail: "Rest now, you'll be more productive afterwards.",
     urgency: 'normal',
   };
 
   if (hour >= 17 && dueTodayTasks.length > 0) return {
-    emoji: '⏰',
     headline: `${dueTodayTasks.length} task${dueTodayTasks.length > 1 ? 's' : ''} still due today`,
     detail: `Push to finish "${dueTodayTasks[0]?.title}" before you log off.`,
     urgency: 'warning',
   };
 
   if (completedToday >= 5) return {
-    emoji: '🏆',
     headline: `Outstanding! ${completedToday} tasks completed`,
     detail: topTask ? `Consider tackling "${topTask.title}" too.` : "You're crushing it today!",
     urgency: 'normal',
   };
 
   if (topTask) return {
-    emoji: '🎯',
     headline: `Focus: ${topTask.title}`,
     detail: `${dueTodayTasks.length} tasks due today. Start here.`,
     urgency: 'normal',
   };
 
   return {
-    emoji: '✨',
     headline: 'All clear — great job!',
     detail: 'No urgent tasks. Add something new to keep momentum.',
     urgency: 'normal',
@@ -243,29 +252,42 @@ export default function Home() {
       <AppShell>
         <div className="max-w-2xl mx-auto py-12 px-4">
           <div className="mb-8 text-center">
-            <div className="text-6xl mb-4 animate-bounce" style={{ animationDuration: '2s' }}>👋</div>
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'var(--accent-color)' }}
+            >
+              <Target className="w-8 h-8 text-white" />
+            </div>
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-3">Welcome, {name}!</h1>
             <p className="text-gray-600 dark:text-gray-400 text-lg">Get organized, stay focused, and crush your goals.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
-              <p className="text-3xl mb-2">📝</p>
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-all cursor-default">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-3">
+                <CheckSquare className="w-5 h-5 text-blue-500" />
+              </div>
               <p className="font-semibold text-gray-900 dark:text-white mb-1">Create Tasks</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Add goals and track progress</p>
             </div>
-            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
-              <p className="text-3xl mb-2">⏱️</p>
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-all cursor-default">
+              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center mb-3">
+                <Timer className="w-5 h-5 text-purple-500" />
+              </div>
               <p className="font-semibold text-gray-900 dark:text-white mb-1">Focus Sessions</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Deep work with the Pomodoro timer</p>
             </div>
-            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
-              <p className="text-3xl mb-2">🤖</p>
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-all cursor-default">
+              <div className="w-10 h-10 rounded-xl bg-green-50 dark:bg-green-900/30 flex items-center justify-center mb-3">
+                <Bot className="w-5 h-5 text-green-500" />
+              </div>
               <p className="font-semibold text-gray-900 dark:text-white mb-1">AI Assistant</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Get smart recommendations and briefings</p>
             </div>
-            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md hover:border-accent/30 transition-all cursor-default">
-              <p className="text-3xl mb-2">💤</p>
+            <div className="p-5 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md transition-all cursor-default">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center mb-3">
+                <Moon className="w-5 h-5 text-indigo-500" />
+              </div>
               <p className="font-semibold text-gray-900 dark:text-white mb-1">Track Health</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Monitor sleep, energy, and habits</p>
             </div>
@@ -302,7 +324,9 @@ export default function Home() {
             'bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 shadow-sm'
           }`}>
             <div className="flex items-start gap-3">
-              <span className="text-2xl flex-shrink-0">{smartMsg.emoji}</span>
+              {smartMsg.urgency === 'critical' && <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />}
+              {smartMsg.urgency === 'warning' && <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />}
+              {smartMsg.urgency === 'normal' && <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />}
               <div className="flex-1 min-w-0">
                 <p className={`font-semibold text-sm ${
                   smartMsg.urgency === 'critical' ? 'text-red-700 dark:text-red-400' :
@@ -328,7 +352,7 @@ export default function Home() {
               <p className="text-lg font-bold leading-snug mb-3">{topPriorityTask.title}</p>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 text-white/80 text-sm">
-                  {topPriorityTask.estimatedDuration && <span>⏱ {topPriorityTask.estimatedDuration}m</span>}
+                  {topPriorityTask.estimatedDuration && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{topPriorityTask.estimatedDuration}m</span>}
                   <span>{PRIORITY_LABEL[topPriorityTask.priority] || 'Medium'} priority</span>
                 </div>
                 <Link
@@ -352,7 +376,7 @@ export default function Home() {
             </div>
             {gamificationProgress && (
               <div className="flex-shrink-0 flex items-center gap-1.5 bg-amber-50 border border-amber-100 rounded-full px-3 py-1.5 shadow-sm">
-                <span className="text-sm">🔥</span>
+                <Flame className="w-3.5 h-3.5 text-amber-500" />
                 <span className="text-sm font-bold text-amber-700">{gamificationProgress.currentStreak}</span>
                 <span className="text-xs text-amber-600">day streak</span>
               </div>
@@ -392,7 +416,7 @@ export default function Home() {
           </div>
           <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl mx-4 mb-6 overflow-hidden shadow-sm">
             {displayTasks.length === 0 ? (
-              <div className="py-8 text-center text-gray-400 text-sm">No active tasks — great job! 🎉</div>
+              <div className="py-8 text-center text-gray-400 text-sm">No active tasks — great job!</div>
             ) : (
               displayTasks.map((task, idx) => (
                 <div
@@ -412,7 +436,7 @@ export default function Home() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{task.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-gray-400">{CATEGORY_EMOJI[task.category] || '📌'} {task.category}</span>
+                      <span className="text-xs text-gray-400 flex items-center gap-1"><CategoryIcon category={task.category} /> {task.category}</span>
                       {task.estimatedDuration && <span className="text-xs text-gray-400">· {task.estimatedDuration}m</span>}
                       {task.deadline && (
                         <span className={`text-xs font-medium ${new Date(task.deadline) < new Date() ? 'text-red-500' : 'text-gray-400'}`}>
@@ -444,7 +468,7 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">🔥{gamificationProgress.currentStreak}</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center gap-1"><Flame className="w-5 h-5 text-amber-500" />{gamificationProgress.currentStreak}</p>
                   <p className="text-xs text-gray-500">day streak</p>
                 </div>
                 <div className="text-center">
@@ -459,21 +483,19 @@ export default function Home() {
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Quick Links</h3>
             <div className="space-y-1">
               {[
-                { href: '/tasks', emoji: '📝', label: 'Tasks' },
-                { href: '/focus', emoji: '⏱️', label: 'Focus' },
-                { href: '/assistant', emoji: '🤖', label: 'AI Assistant' },
-                { href: '/planner', emoji: '📅', label: 'Planner' },
+                { href: '/tasks', icon: <CheckSquare className="w-4 h-4" />, label: 'Tasks' },
+                { href: '/focus', icon: <Timer className="w-4 h-4" />, label: 'Focus' },
+                { href: '/assistant', icon: <Bot className="w-4 h-4" />, label: 'AI Assistant' },
+                { href: '/planner', icon: <Calendar className="w-4 h-4" />, label: 'Planner' },
               ].map(l => (
                 <Link
                   key={l.href}
                   href={l.href}
                   className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group"
                 >
-                  <span className="text-base">{l.emoji}</span>
+                  <span className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{l.icon}</span>
                   <span className="text-sm text-gray-700 dark:text-gray-300">{l.label}</span>
-                  <svg className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-gray-500 ml-auto" />
                 </Link>
               ))}
             </div>
