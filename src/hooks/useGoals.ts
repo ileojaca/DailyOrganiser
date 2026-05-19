@@ -13,6 +13,16 @@ import {
 } from 'firebase/firestore'
 import { getDb } from '@/lib/firebase'
 
+export interface GoalRecurrence {
+  type: 'daily' | 'weekdays' | 'weekend' | 'weekly' | 'custom'
+  days?: number[]  // 0=Sun..6=Sat, used when type='custom'
+  timesPerDay?: number
+  preferredTime?: string  // HH:MM format
+  fixedStart?: string  // HH:MM, for work blocks
+  fixedEnd?: string    // HH:MM, for work blocks
+  breakDuration?: number  // minutes, for work blocks
+}
+
 export interface Goal {
   id: string
   userId: string
@@ -37,6 +47,10 @@ export interface Goal {
   createdAt: Date
   updatedAt: Date
   completedAt?: Date
+  goalType?: 'task' | 'habit' | 'block' | 'project'
+  recurrence?: GoalRecurrence
+  targetDate?: Date
+  studySessionDuration?: number
 }
 
 interface CreateGoalInput {
@@ -48,6 +62,10 @@ interface CreateGoalInput {
   deadline?: Date
   energyRequired?: number
   context?: Goal['context']
+  goalType?: Goal['goalType']
+  recurrence?: GoalRecurrence
+  targetDate?: Date
+  studySessionDuration?: number
 }
 
 interface UpdateGoalInput {
@@ -65,6 +83,10 @@ interface UpdateGoalInput {
   scheduledEnd?: Date
   assigneeId?: string
   completedAt?: Date
+  goalType?: Goal['goalType']
+  recurrence?: GoalRecurrence
+  targetDate?: Date
+  studySessionDuration?: number
 }
 
 export function useGoals(userId: string | undefined) {
@@ -112,7 +134,11 @@ export function useGoals(userId: string | undefined) {
             assigneeId: data.assigneeId,
             createdAt: data.createdAt?.toDate(),
             updatedAt: data.updatedAt?.toDate(),
-            completedAt: data.completedAt?.toDate()
+            completedAt: data.completedAt?.toDate(),
+            goalType: data.goalType || 'task',
+            recurrence: data.recurrence || undefined,
+            targetDate: data.targetDate?.toDate(),
+            studySessionDuration: data.studySessionDuration,
           } as Goal
           // Debug logging for scheduled tasks
           if (goal.scheduledStart) {
@@ -146,7 +172,7 @@ export function useGoals(userId: string | undefined) {
 
     const db = getDb()
     const now = Timestamp.now()
-    const goalData = {
+    const goalData: Record<string, unknown> = {
       title: input.title,
       description: input.description || null,
       category: input.category,
@@ -160,6 +186,10 @@ export function useGoals(userId: string | undefined) {
       createdAt: now,
       updatedAt: now
     }
+    if (input.goalType !== undefined) goalData.goalType = input.goalType
+    if (input.recurrence !== undefined) goalData.recurrence = input.recurrence
+    if (input.targetDate !== undefined) goalData.targetDate = Timestamp.fromDate(input.targetDate)
+    if (input.studySessionDuration !== undefined) goalData.studySessionDuration = input.studySessionDuration
 
     const goalsRef = collection(db, 'users', userId, 'goals')
     const docRef = await addDoc(goalsRef, goalData)
@@ -189,6 +219,10 @@ export function useGoals(userId: string | undefined) {
     if (input.scheduledEnd !== undefined) updateData.scheduledEnd = input.scheduledEnd ? Timestamp.fromDate(input.scheduledEnd) : null
     if (input.assigneeId !== undefined) updateData.assigneeId = input.assigneeId
     if (input.completedAt !== undefined) updateData.completedAt = input.completedAt ? Timestamp.fromDate(input.completedAt) : null
+    if (input.goalType !== undefined) updateData.goalType = input.goalType
+    if (input.recurrence !== undefined) updateData.recurrence = input.recurrence
+    if (input.targetDate !== undefined) updateData.targetDate = input.targetDate ? Timestamp.fromDate(input.targetDate) : null
+    if (input.studySessionDuration !== undefined) updateData.studySessionDuration = input.studySessionDuration
 
     const goalRef = doc(db, 'users', userId, 'goals', goalId)
     await updateDoc(goalRef, updateData)

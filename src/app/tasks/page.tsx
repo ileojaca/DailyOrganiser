@@ -5,8 +5,9 @@ import { useState } from 'react';
 import AppShell from '@/components/AppShell';
 import CreateGoalModal from '@/components/CreateGoalModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { useGoals } from '@/hooks/useGoals';
+import { useGoals, Goal } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { Pencil, Trash2 } from 'lucide-react';
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Normal', 3: 'Medium', 4: 'High', 5: 'Critical' };
 const CATEGORY_EMOJI: Record<string, string> = { work: '💼', personal: '⭐', health: '🏃', learning: '📚', social: '👥', family: '👨‍👩‍👧' };
@@ -62,15 +63,17 @@ const STATUS_STYLES: Record<string, string> = {
 
 export default function TasksPage() {
   const { user } = useAuth();
-  const { goals, createGoal, updateGoal, completeGoal, loading: goalsLoading } = useGoals(user?.uid);
+  const { goals, createGoal, updateGoal, deleteGoal, completeGoal, loading: goalsLoading } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('priority');
   const [quickTask, setQuickTask] = useState('');
   const [quickCategory, setQuickCategory] = useState<'work' | 'personal' | 'health' | 'learning' | 'social' | 'family'>('personal');
   const [quickPriority, setQuickPriority] = useState(3);
+  const [quickDuration, setQuickDuration] = useState(30);
   const [addingTask, setAddingTask] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Goal | null>(null);
 
   const filteredTasks = goals.filter(g => {
     if (filter === 'all') return g.status === 'pending' || g.status === 'in_progress';
@@ -99,7 +102,7 @@ export default function TasksPage() {
         title: quickTask.trim(),
         category: quickCategory,
         priority: quickPriority,
-        estimatedDuration: 30,
+        estimatedDuration: quickDuration,
         energyRequired: 5
       });
       setQuickTask('');
@@ -115,6 +118,16 @@ export default function TasksPage() {
       await completeGoal(task.id);
     } else {
       await updateGoal(task.id, { status: next });
+    }
+  };
+
+  const handleDeleteTask = async (task: Goal) => {
+    if (!window.confirm(`Delete "${task.title}"? This cannot be undone.`)) return;
+    try {
+      await deleteGoal(task.id);
+      addNotification({ type: 'success', title: 'Task deleted', message: `"${task.title}" has been removed.` });
+    } catch {
+      addNotification({ type: 'error', title: 'Error', message: 'Failed to delete task.' });
     }
   };
 
@@ -218,7 +231,7 @@ export default function TasksPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${priorityBadge(task.priority)}`}>
                     {PRIORITY_LABEL[task.priority] || 'Medium'}
                   </span>
@@ -228,6 +241,20 @@ export default function TasksPage() {
                     className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:opacity-80 ${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}
                   >
                     {STATUS_LABEL[task.status] || 'To Do'}
+                  </button>
+                  <button
+                    onClick={() => setEditingTask(task)}
+                    title="Edit task"
+                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteTask(task)}
+                    title="Delete task"
+                    className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -286,6 +313,20 @@ export default function TasksPage() {
                 </div>
               </div>
 
+              <div>
+                <label htmlFor="quickDuration" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Duration (min)</label>
+                <input
+                  id="quickDuration"
+                  type="number"
+                  value={quickDuration}
+                  onChange={(e) => setQuickDuration(parseInt(e.target.value) || 30)}
+                  min="5"
+                  max="480"
+                  step="5"
+                  className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white"
+                />
+              </div>
+
               <button
                 type="submit"
                 disabled={!quickTask.trim() || addingTask}
@@ -315,11 +356,25 @@ export default function TasksPage() {
         </div>
       </div>
 
+      {/* Create modal */}
       <CreateGoalModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
+        mode="create"
         onSuccess={() => {
           addNotification({ type: 'success', title: 'Goal created', message: 'Your goal has been added.' });
+        }}
+      />
+
+      {/* Edit modal */}
+      <CreateGoalModal
+        isOpen={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        mode="edit"
+        editingGoal={editingTask ?? undefined}
+        onSuccess={() => {
+          addNotification({ type: 'success', title: 'Goal updated', message: 'Your goal has been saved.' });
+          setEditingTask(null);
         }}
       />
     </AppShell>
