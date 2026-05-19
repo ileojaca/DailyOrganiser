@@ -93,7 +93,7 @@ async function callOpenRouter(
     ...messages.map(m => ({
       role: m.role,
       content: typeof m.content === 'string' ? m.content : 
-        Array.isArray(m.content) ? m.content.find((b: {type: string}) => b.type === 'text')?.text || '' : '',
+        Array.isArray(m.content) ? (m.content.find((b) => b.type === 'text') as { type: 'text'; text: string } | undefined)?.text || '' : '',
     })),
   ];
 
