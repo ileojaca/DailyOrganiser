@@ -142,6 +142,17 @@ export default function AssistantPage() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (res.status === 429 && err.limitReached) {
+          const limitMsg: Message = {
+            id: (Date.now() + 1).toString(),
+            role: 'assistant',
+            content: err.error || 'Daily AI limit reached. Upgrade to Pro for unlimited access.',
+            timestamp: new Date(),
+          };
+          setMessages(prev => [...prev, limitMsg]);
+          setIsLoading(false);
+          return;
+        }
         throw new Error(err.error || 'Failed to get response');
       }
 

@@ -170,6 +170,25 @@ export async function POST(request: NextRequest) {
       console.warn('Firestore context unavailable:', err);
     }
 
+    // Enforce free-tier AI limit (10 requests/day)
+    const subscriptionTier = (profile?.subscription_tier as string) || 'free';
+    if (subscriptionTier === 'free') {
+      const db = getAdminDb();
+      const todayKey = new Date().toISOString().split('T')[0];
+      const usageRef = db.collection('users').doc(uid).collection('aiUsage').doc(todayKey);
+      const usageSnap = await usageRef.get();
+      const usageCount = (usageSnap.data()?.count as number) || 0;
+      const FREE_DAILY_LIMIT = 10;
+      if (usageCount >= FREE_DAILY_LIMIT) {
+        return NextResponse.json({
+          error: `Daily AI limit reached (${FREE_DAILY_LIMIT} requests/day on Free plan). Upgrade to Pro for unlimited access.`,
+          limitReached: true,
+        }, { status: 429 });
+      }
+      // Increment counter
+      await usageRef.set({ count: FieldValue.increment(1), date: todayKey }, { merge: true });
+    }
+
     const toDate = (v: GoalData['deadline']): Date | null => {
       if (!v) return null;
       if (typeof v === 'string') return new Date(v);
