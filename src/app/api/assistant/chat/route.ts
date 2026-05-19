@@ -264,7 +264,8 @@ RULES:
 - "plan my day" → call schedule_day
 - "add [task]" → call create_task immediately
 - Always address burnout signals before talking about productivity
-- A balanced life IS productive — remind the user of this`;
+- A balanced life IS productive — remind the user of this
+- Recurring habits and fixed work blocks are already pre-scheduled by the system before other tasks. Do not schedule over them.`;
 
     const messages: Anthropic.Messages.MessageParam[] = [
       ...conversationHistory.slice(-10),
@@ -362,18 +363,122 @@ RULES:
 
           // If already past end time today, push to next day
           if (isToday && currentTime >= endTime) {
-            const tomorrow = new Date(baseDate);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            currentTime = new Date(tomorrow);
+            const tomorrowDate = new Date(baseDate);
+            tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+            currentTime = new Date(tomorrowDate);
             currentTime.setHours(startHour, 0, 0, 0);
             endTime.setDate(endTime.getDate() + 1);
           }
 
           let scheduled = 0;
+
+          // Load all goals to find recurring ones (habits and blocks)
+          const allGoalsSnap = await db.collection('users').doc(uid).collection('goals').get();
+          const recurringGoals = allGoalsSnap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter((g: Record<string, unknown>) => g.goalType === 'habit' || g.goalType === 'block');
+
+          // Determine day of week for baseDate (0=Sun..6=Sat)
+          const targetDow = baseDate.getDay();
+
+          // Filter recurring goals that apply to targetDow
+          const applicableRecurring = recurringGoals.filter((g: Record<string, unknown>) => {
+            const r = g.recurrence as Record<string, unknown> | undefined;
+            if (!r) return false;
+            if (r.type === 'daily') return true;
+            if (r.type === 'weekdays') return targetDow >= 1 && targetDow <= 5;
+            if (r.type === 'weekend') return targetDow === 0 || targetDow === 6;
+            if (r.type === 'custom') return Array.isArray(r.days) && (r.days as number[]).includes(targetDow);
+            return false;
+          });
+
+          // Build blocked intervals from work blocks and habits
+          const blockedIntervals: Array<{ start: Date; end: Date }> = [];
+
+          for (const rg of applicableRecurring) {
+            const rgData = rg as Record<string, unknown>;
+            if (rgData.goalType === 'block') {
+              const r = rgData.recurrence as Record<string, unknown>;
+              if (r && r.fixedStart && r.fixedEnd) {
+                const [sh, sm] = (r.fixedStart as string).split(':').map(Number);
+                const [eh, em] = (r.fixedEnd as string).split(':').map(Number);
+                const blockStart = new Date(baseDate);
+                blockStart.setHours(sh, sm, 0, 0);
+                const blockEnd = new Date(baseDate);
+                blockEnd.setHours(eh, em, 0, 0);
+                blockedIntervals.push({ start: blockStart, end: blockEnd });
+                await db.collection('users').doc(uid).collection('goals').doc(rgData.id as string).update({
+                  scheduledStart: Timestamp.fromDate(blockStart),
+                  scheduledEnd: Timestamp.fromDate(blockEnd),
+                  updatedAt: FieldValue.serverTimestamp(),
+                });
+                scheduled++;
+              }
+            } else if (rgData.goalType === 'habit') {
+              const r = rgData.recurrence as Record<string, unknown>;
+              const habitDuration = (rgData.estimatedDuration as number) || 30;
+              const timesPerDay = (r?.timesPerDay as number) || 1;
+              const preferredTime = r?.preferredTime as string | undefined;
+              let habitStart: Date;
+              if (preferredTime && /^\d{2}:\d{2}$/.test(preferredTime)) {
+                const [hh, mm] = preferredTime.split(':').map(Number);
+                habitStart = new Date(baseDate);
+                habitStart.setHours(hh, mm, 0, 0);
+              } else {
+                habitStart = new Date(currentTime);
+              }
+              for (let t = 0; t < timesPerDay; t++) {
+                const habitEnd = new Date(habitStart.getTime() + habitDuration * 60000);
+                blockedIntervals.push({ start: habitStart, end: habitEnd });
+                await db.collection('users').doc(uid).collection('goals').doc(rgData.id as string).update({
+                  scheduledStart: Timestamp.fromDate(habitStart),
+                  scheduledEnd: Timestamp.fromDate(habitEnd),
+                  updatedAt: FieldValue.serverTimestamp(),
+                });
+                scheduled++;
+                habitStart = new Date(habitEnd.getTime() + 5 * 60000);
+              }
+            }
+          }
+
+          // Helper: check if a time slot overlaps any blocked interval
+          function overlapsBlocked(start: Date, end: Date): boolean {
+            return blockedIntervals.some(b => start < b.end && end > b.start);
+          }
+
+          // Advance currentTime past any blocked intervals at the start
+          function advancePastBlocked(time: Date): Date {
+            let t = new Date(time);
+            let changed = true;
+            while (changed) {
+              changed = false;
+              for (const b of blockedIntervals) {
+                if (t >= b.start && t < b.end) {
+                  t = new Date(b.end);
+                  changed = true;
+                }
+              }
+            }
+            return t;
+          }
+
+          currentTime = advancePastBlocked(currentTime);
+
           for (const task of pending.slice(0, 8)) {
             const duration = (task.estimatedDuration as number) || 60;
-            const taskEnd = new Date(currentTime.getTime() + duration * 60000);
+            let taskEnd = new Date(currentTime.getTime() + duration * 60000);
             if (taskEnd > endTime) break;
+
+            // Skip past blocked intervals
+            while (overlapsBlocked(currentTime, taskEnd)) {
+              const blocker = blockedIntervals.find(b => currentTime < b.end && taskEnd > b.start);
+              if (!blocker) break;
+              currentTime = new Date(blocker.end.getTime() + 5 * 60000);
+              taskEnd = new Date(currentTime.getTime() + duration * 60000);
+            }
+
+            if (taskEnd > endTime) break;
+
             await db.collection('users').doc(uid).collection('goals').doc(task.id).update({
               scheduledStart: Timestamp.fromDate(currentTime),
               scheduledEnd: Timestamp.fromDate(taskEnd),
