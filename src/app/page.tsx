@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   AlertCircle, AlertTriangle, Info, Target, Clock, Briefcase, Star, Activity,
@@ -16,6 +16,8 @@ import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useSleepAndEnergy } from '@/hooks/useSleepAndEnergy';
 import { scheduleTaskReminder } from '@/lib/notificationScheduler';
+import { getDb } from '@/lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Normal', 3: 'Medium', 4: 'High', 5: 'Critical' };
 
@@ -139,6 +141,7 @@ export default function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [sleepHours, setSleepHours] = useState<number>(7);
   const [savingSleep, setSavingSleep] = useState(false);
+  const [gamification, setGamification] = useState<{ totalPoints: number; currentStreak: number; level: number; achievements: Array<{ name: string; icon: string }> }>({ totalPoints: 0, currentStreak: 0, level: 0, achievements: [] });
 
   const hour = new Date().getHours();
   const name = profile?.fullName?.split(' ')[0] || 'there';
@@ -257,6 +260,25 @@ export default function Home() {
     const neverShow = localStorage.getItem('dailyOrganiserNeverShowOnboarding') === 'true';
     if (!neverShow && goals.length === 0) setShowOnboarding(true);
   }, [goals.length]);
+
+  // Subscribe to gamification data
+  useEffect(() => {
+    if (!user) return;
+    const db = getDb();
+    const ref = doc(db, 'users', user.uid, 'gamification', 'data');
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setGamification({
+          totalPoints: d.totalPoints || 0,
+          currentStreak: d.currentStreak || 0,
+          level: d.level || 0,
+          achievements: d.achievements || [],
+        });
+      }
+    });
+    return () => unsub();
+  }, [user]);
 
   const completeOnboarding = () => {
     setShowOnboarding(false);
@@ -409,7 +431,21 @@ export default function Home() {
             {completedToday.length > 0 && (
               <div className="flex-shrink-0 flex items-center gap-1.5 bg-green-50 border border-green-100 dark:bg-green-900/20 dark:border-green-900 rounded-full px-3 py-2 shadow-sm">
                 <span className="text-sm font-bold text-green-600 dark:text-green-400">{completedToday.length}</span>
-                <span className="text-xs text-green-600 dark:text-green-400">completed</span>
+                <span className="text-xs text-green-600 dark:text-green-400">done today</span>
+              </div>
+            )}
+            {gamification.currentStreak > 0 && (
+              <div className="flex-shrink-0 flex items-center gap-1.5 bg-orange-50 border border-orange-100 dark:bg-orange-900/20 dark:border-orange-900 rounded-full px-3 py-2 shadow-sm" title="Day streak">
+                <span className="text-base">🔥</span>
+                <span className="text-sm font-bold text-orange-600 dark:text-orange-400">{gamification.currentStreak}</span>
+                <span className="text-xs text-orange-600 dark:text-orange-400">streak</span>
+              </div>
+            )}
+            {gamification.totalPoints > 0 && (
+              <div className="flex-shrink-0 flex items-center gap-1.5 bg-yellow-50 border border-yellow-100 dark:bg-yellow-900/20 dark:border-yellow-900 rounded-full px-3 py-2 shadow-sm" title={`Level ${gamification.level}`}>
+                <span className="text-base">⭐</span>
+                <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{gamification.totalPoints}</span>
+                <span className="text-xs text-yellow-600 dark:text-yellow-400">pts</span>
               </div>
             )}
           </div>
