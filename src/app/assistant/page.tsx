@@ -2,9 +2,11 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, CheckCircle } from 'lucide-react';
+import { Bot, CheckCircle, Calendar, Bell, X } from 'lucide-react';
+import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 
 interface Message {
   id: string;
@@ -36,9 +38,13 @@ export default function AssistantPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [showNotifBanner, setShowNotifBanner] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasGreeted = useRef(false);
+  const hasShownBanner = useRef(false);
+
+  const { permission, requestPermission, scheduleLocalNotification } = useNotificationPermission();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -153,6 +159,25 @@ export default function AssistantPage() {
         { role: 'user', content: text },
         { role: 'assistant', content: data.response || '' },
       ]);
+
+      // Show notification banner after first AI response if permission not yet asked
+      if (!isGreeting && !hasShownBanner.current && permission === 'default') {
+        hasShownBanner.current = true;
+        setShowNotifBanner(true);
+      }
+
+      // Schedule notification when schedule_day tool was used
+      const hasScheduleDay = data.toolResults?.some(
+        (tr: { toolName: string }) => tr.toolName === 'schedule_day'
+      );
+      if (hasScheduleDay && permission === 'granted') {
+        scheduleLocalNotification(
+          'Your day is planned!',
+          'Check your schedule.',
+          '/planner?view=calendar',
+          1000
+        );
+      }
     } catch (err) {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -226,6 +251,28 @@ export default function AssistantPage() {
           </div>
         </div>
 
+        {showNotifBanner && permission === 'default' && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex-shrink-0">
+            <Bell className="w-4 h-4 text-blue-500 flex-shrink-0" />
+            <p className="text-xs text-blue-700 dark:text-blue-300 flex-1">
+              Enable notifications to get reminders?
+            </p>
+            <button
+              onClick={() => { requestPermission(); setShowNotifBanner(false); }}
+              className="text-xs px-3 py-1 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-colors flex-shrink-0"
+            >
+              Enable
+            </button>
+            <button
+              onClick={() => setShowNotifBanner(false)}
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {messages.length === 0 && !isLoading && loadingHistory && (
             <div className="flex items-center justify-center h-full">
@@ -254,9 +301,20 @@ export default function AssistantPage() {
                   <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-800 dark:text-gray-200 shadow-sm">
                     <div>{renderContent(msg.content)}</div>
                     {msg.toolResults?.map(tr => (
-                      <div key={tr.toolName} className="mt-2 flex items-center gap-1.5 text-xs text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">
-                        <CheckCircle className="w-3 h-3" />
-                        <span>{tr.result}</span>
+                      <div key={tr.toolName} className="mt-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">
+                          <CheckCircle className="w-3 h-3" />
+                          <span>{tr.result}</span>
+                        </div>
+                        {tr.toolName === 'schedule_day' && (
+                          <Link
+                            href="/planner?view=calendar"
+                            className="text-xs px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors flex items-center gap-1.5"
+                          >
+                            <Calendar className="w-3 h-3" />
+                            View in calendar
+                          </Link>
+                        )}
                       </div>
                     ))}
                   </div>

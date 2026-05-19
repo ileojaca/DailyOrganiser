@@ -24,7 +24,9 @@ export const OPENROUTER_MODELS = [
   { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini' },
   { id: 'openai/gpt-4o', name: 'GPT-4o' },
   { id: 'google/gemini-flash-1.5', name: 'Gemini Flash 1.5' },
+  { id: 'meta-llama/llama-3.3-70b-instruct:free', name: 'Llama 3.3 70B (Free)' },
   { id: 'meta-llama/llama-3.1-8b-instruct:free', name: 'Llama 3.1 8B (Free)' },
+  { id: 'deepseek/deepseek-r1:free', name: 'DeepSeek R1 (Free)' },
   { id: 'mistralai/mistral-7b-instruct:free', name: 'Mistral 7B (Free)' },
 ];
 
