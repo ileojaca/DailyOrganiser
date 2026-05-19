@@ -40,7 +40,9 @@ function formatDeadline(deadline: Date): string {
 type FilterType = 'all' | 'in_progress' | 'completed';
 type SortType = 'priority' | 'due' | 'created';
 
-const STATUS_CYCLE: Record<string, string> = {
+type GoalStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'deferred';
+
+const STATUS_CYCLE: Record<string, GoalStatus> = {
   pending: 'in_progress',
   in_progress: 'completed',
   completed: 'pending',
