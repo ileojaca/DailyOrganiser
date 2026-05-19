@@ -40,6 +40,24 @@ function formatDeadline(deadline: Date): string {
 type FilterType = 'all' | 'in_progress' | 'completed';
 type SortType = 'priority' | 'due' | 'created';
 
+const STATUS_CYCLE: Record<string, string> = {
+  pending: 'in_progress',
+  in_progress: 'completed',
+  completed: 'pending',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'To Do',
+  in_progress: 'In Progress',
+  completed: 'Done',
+};
+
+const STATUS_STYLES: Record<string, string> = {
+  pending: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+  in_progress: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  completed: 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+};
+
 export default function TasksPage() {
   const { user } = useAuth();
   const { goals, createGoal, updateGoal, completeGoal, loading: goalsLoading } = useGoals(user?.uid);
@@ -89,11 +107,12 @@ export default function TasksPage() {
     }
   };
 
-  const handleTaskCircleClick = async (task: typeof goals[0]) => {
-    if (task.status === 'pending') {
-      await updateGoal(task.id, { status: 'in_progress' });
-    } else if (task.status === 'in_progress') {
+  const handleStatusCycle = async (task: typeof goals[0]) => {
+    const next = STATUS_CYCLE[task.status] || 'pending';
+    if (next === 'completed') {
       await completeGoal(task.id);
+    } else {
+      await updateGoal(task.id, { status: next });
     }
   };
 
@@ -178,25 +197,11 @@ export default function TasksPage() {
             {sortedTasks.map((task, idx) => (
               <div
                 key={task.id}
-                className={`flex items-center gap-3 px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                className={`flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
                   idx < sortedTasks.length - 1 ? 'border-b border-gray-100 dark:border-gray-700' : ''
                 }`}
               >
-                <div className={`w-1 h-12 rounded-full flex-shrink-0 ${priorityBarColor(task.priority)}`} />
-                <button
-                  onClick={() => handleTaskCircleClick(task)}
-                  className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 hover:border-accent flex-shrink-0 flex items-center justify-center transition-colors"
-                  style={{ borderColor: task.status === 'in_progress' ? 'var(--accent-color)' : undefined }}
-                >
-                  {task.status === 'in_progress' && (
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--accent-color)' }} />
-                  )}
-                  {task.status === 'completed' && (
-                    <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </button>
+                <div className={`w-1 h-10 rounded-full flex-shrink-0 ${priorityBarColor(task.priority)}`} />
                 <div className="flex-1 min-w-0">
                   <p className={`text-sm font-medium truncate ${task.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>
                     {task.title}
@@ -211,9 +216,18 @@ export default function TasksPage() {
                     )}
                   </div>
                 </div>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${priorityBadge(task.priority)}`}>
-                  {PRIORITY_LABEL[task.priority] || 'Medium'}
-                </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${priorityBadge(task.priority)}`}>
+                    {PRIORITY_LABEL[task.priority] || 'Medium'}
+                  </span>
+                  <button
+                    onClick={() => handleStatusCycle(task)}
+                    title={`Click to change: ${STATUS_LABEL[task.status]} → ${STATUS_LABEL[STATUS_CYCLE[task.status] || 'pending']}`}
+                    className={`text-xs font-medium px-2.5 py-1 rounded-full transition-colors hover:opacity-80 ${STATUS_STYLES[task.status] || STATUS_STYLES.pending}`}
+                  >
+                    {STATUS_LABEL[task.status] || 'To Do'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
