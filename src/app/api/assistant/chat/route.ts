@@ -174,9 +174,13 @@ RULES:
       : new Anthropic({
           apiKey: openrouterKey!,
           baseURL: 'https://openrouter.ai/api/v1',
+          defaultHeaders: {
+            'HTTP-Referer': 'https://daily-organiser.vercel.app',
+            'X-Title': 'DailyOrganiser',
+          },
         });
 
-    const model = anthropicKey ? 'claude-haiku-4-5-20251001' : 'anthropic/claude-3.5-haiku';
+    const model = anthropicKey ? 'claude-haiku-4-5-20251001' : 'claude-3-5-haiku';
 
     const recentHistory = conversationHistory.slice(-10);
     const messages: Anthropic.Messages.MessageParam[] = [
