@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import AppShell from '@/components/AppShell';
+import GoogleCalendarSync from '@/components/GoogleCalendarSync';
 import { SUBSCRIPTION_TIERS, getTierById } from '@/config/subscriptionTiers';
 import { ANTHROPIC_MODELS, OPENROUTER_MODELS, type AIProvider } from '@/lib/aiClient';
 
@@ -20,7 +21,7 @@ interface UserProfile {
 export default function SettingsPage() {
   const { user, profile, updateProfile, signOut } = useAuth();
   const { mode, setMode, accentColor, setAccentColor } = useTheme();
-  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'appearance' | 'ai' | 'subscription' | 'account'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'notifications' | 'appearance' | 'ai' | 'integrations' | 'account'>('profile');
   const [aiProvider, setAiProvider] = useState<AIProvider>('auto');
   const [aiModel, setAiModel] = useState<string>('');
   const [saving, setSaving] = useState(false);
@@ -163,7 +164,7 @@ export default function SettingsPage() {
             { id: 'notifications', label: 'Notifications' },
             { id: 'appearance', label: 'Appearance' },
             { id: 'ai', label: 'AI' },
-            { id: 'subscription', label: 'Subscription' },
+            { id: 'integrations', label: 'Integrations' },
             { id: 'account', label: 'Account' },
           ].map((tab) => (
             <button
@@ -539,76 +540,19 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Subscription Tab */}
-        {activeTab === 'subscription' && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 space-y-6">
-            <div>
-              <h3 className="font-medium text-gray-900 dark:text-white mb-2">Current Plan</h3>
-              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      {getTierById(profile?.subscription_tier || 'free')?.name || 'Free'} Plan
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {profile?.subscription_tier === 'free' ? 'Limited features' : 'Full access to all features'}
-                    </p>
-                  </div>
-                  {profile?.subscription_tier !== 'free' && (
-                    <button
-                      onClick={handleManageSubscription}
-                      disabled={loadingPortal}
-                      className="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 disabled:opacity-50"
-                    >
-                      {loadingPortal ? 'Loading...' : 'Manage Subscription'}
-                    </button>
-                  )}
-                </div>
+        {/* Integrations Tab */}
+        {activeTab === 'integrations' && (
+          <div className="space-y-6">
+            <GoogleCalendarSync />
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h3 className="font-medium text-gray-900 dark:text-white mb-1">Setup required</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">To enable Google Calendar sync, add these environment variables in Vercel:</p>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 space-y-1.5">
+                <code className="block text-xs text-gray-700 dark:text-gray-300">GOOGLE_CLIENT_ID=your_client_id</code>
+                <code className="block text-xs text-gray-700 dark:text-gray-300">GOOGLE_CLIENT_SECRET=your_client_secret</code>
+                <code className="block text-xs text-gray-700 dark:text-gray-300">NEXT_PUBLIC_APP_URL=https://your-app.vercel.app</code>
               </div>
-            </div>
-
-            <div>
-              <h3 className="font-medium text-gray-900 dark:text-white mb-4">Available Plans</h3>
-              <div className="grid gap-4 md:grid-cols-3">
-                {Object.values(SUBSCRIPTION_TIERS).map((tier) => (
-                  <div
-                    key={tier.id}
-                    className={`p-4 rounded-lg border-2 ${
-                      profile?.subscription_tier === tier.id
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                        : 'border-gray-200 dark:border-gray-600'
-                    }`}
-                  >
-                    <h4 className="font-semibold text-gray-900 dark:text-white">{tier.name}</h4>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">
-                      ${tier.price}<span className="text-sm font-normal">/month</span>
-                    </p>
-                    <ul className="mt-4 space-y-2">
-                      {tier.features.map((feature, index) => (
-                        <li key={index} className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                          <svg className="w-4 h-4 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                    {profile?.subscription_tier !== tier.id && tier.price > 0 && (
-                      <button
-                        onClick={() => handleUpgrade(tier.priceId)}
-                        className="w-full mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                      >
-                        Upgrade to {tier.name}
-                      </button>
-                    )}
-                    {profile?.subscription_tier === tier.id && (
-                      <div className="mt-4 px-4 py-2 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-center text-sm font-medium">
-                        Current Plan
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <p className="text-xs text-gray-400 mt-2">Get credentials at <span className="font-mono">console.cloud.google.com</span> → APIs &amp; Services → Credentials</p>
             </div>
           </div>
         )}

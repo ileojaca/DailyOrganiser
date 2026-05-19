@@ -2,10 +2,11 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bot, CheckCircle, Calendar } from 'lucide-react';
+import { Bot, CheckCircle, Calendar, Bell, X } from 'lucide-react';
 import Link from 'next/link';
 import AppShell from '@/components/AppShell';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 
 interface Message {
   id: string;
@@ -36,9 +37,13 @@ export default function AssistantPage() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
+  const [showNotifBanner, setShowNotifBanner] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasGreeted = useRef(false);
+  const hasShownBanner = useRef(false);
+
+  const { permission, requestPermission, scheduleLocalNotification } = useNotificationPermission();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,6 +103,25 @@ export default function AssistantPage() {
         { role: 'user', content: text },
         { role: 'assistant', content: data.response || '' },
       ]);
+
+      // Show notification banner after first AI response if permission not yet asked
+      if (!isGreeting && !hasShownBanner.current && permission === 'default') {
+        hasShownBanner.current = true;
+        setShowNotifBanner(true);
+      }
+
+      // Schedule notification when schedule_day tool was used
+      const hasScheduleDay = data.toolResults?.some(
+        (tr: { toolName: string }) => tr.toolName === 'schedule_day'
+      );
+      if (hasScheduleDay && permission === 'granted') {
+        scheduleLocalNotification(
+          'Your day is planned!',
+          'Check your schedule.',
+          '/planner?view=calendar',
+          1000
+        );
+      }
     } catch (err) {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
@@ -167,6 +191,28 @@ export default function AssistantPage() {
             <p className="text-xs text-gray-500 dark:text-gray-400">Always here to help you</p>
           </div>
         </div>
+
+        {showNotifBanner && permission === 'default' && (
+          <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 flex-shrink-0">
+            <Bell className="w-4 h-4 text-blue-500 flex-shrink-0" />
+            <p className="text-xs text-blue-700 dark:text-blue-300 flex-1">
+              Enable notifications to get reminders?
+            </p>
+            <button
+              onClick={() => { requestPermission(); setShowNotifBanner(false); }}
+              className="text-xs px-3 py-1 rounded-full bg-blue-500 text-white hover:bg-blue-600 transition-colors flex-shrink-0"
+            >
+              Enable
+            </button>
+            <button
+              onClick={() => setShowNotifBanner(false)}
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
           {messages.length === 0 && !isLoading && (

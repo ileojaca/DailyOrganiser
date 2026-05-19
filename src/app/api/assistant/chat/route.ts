@@ -85,6 +85,7 @@ interface ToolBlock {
 // Call OpenRouter using OpenAI-compatible REST API
 async function callOpenRouter(
   apiKey: string,
+  model: string,
   systemPrompt: string,
   messages: Anthropic.Messages.MessageParam[]
 ): Promise<{ text: string; toolBlocks: ToolBlock[] }> {
@@ -92,7 +93,7 @@ async function callOpenRouter(
     { role: 'system', content: systemPrompt },
     ...messages.map(m => ({
       role: m.role,
-      content: typeof m.content === 'string' ? m.content : 
+      content: typeof m.content === 'string' ? m.content :
         Array.isArray(m.content) ? (m.content.find((b) => b.type === 'text') as { type: 'text'; text: string } | undefined)?.text || '' : '',
     })),
   ];
@@ -106,7 +107,7 @@ async function callOpenRouter(
       'X-Title': 'DailyOrganiser',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-3.5-haiku',
+      model,
       max_tokens: 1024,
       messages: openaiMessages,
       tools: OPENAI_TOOLS,
@@ -197,50 +198,87 @@ export async function POST(request: NextRequest) {
       family: goals.filter(g => g.category === 'family').length,
     };
     const workPercent = goals.length > 0 ? Math.round((categoryBreakdown.work / goals.length) * 100) : 0;
+    const familyPersonalPercent = goals.length > 0
+      ? Math.round(((categoryBreakdown.family + categoryBreakdown.personal) / goals.length) * 100) : 0;
     const isWorkHeavy = workPercent > 60;
+    const isLifeNeglected = familyPersonalPercent < 15 && goals.length > 4;
 
-    const systemPrompt = `You are a proactive, caring personal assistant for ${(profile?.fullName as string) || 'the user'}. You help them stay organized, productive, AND maintain work-life balance.
+    // Burnout risk signals
+    const burnoutSignals: string[] = [];
+    if (avgSleep < 6) burnoutSignals.push(`low sleep (${avgSleep.toFixed(1)}h)`);
+    if (currentEnergy < 4) burnoutSignals.push(`low energy (${currentEnergy}/10)`);
+    if (isWorkHeavy) burnoutSignals.push(`work overload (${workPercent}%)`);
+    if (overdueTasks.length >= 3) burnoutSignals.push(`${overdueTasks.length} overdue tasks`);
+    if (isLifeNeglected) burnoutSignals.push('no family/personal time scheduled');
+    const burnoutRisk = burnoutSignals.length >= 2 ? 'HIGH' : burnoutSignals.length === 1 ? 'MEDIUM' : 'LOW';
+
+    // Today's checkin sleep (more accurate than historical records)
+    let todaySleep: number | null = null;
+    try {
+      const db = getAdminDb();
+      const todayStr = now.toISOString().slice(0, 10);
+      const checkinSnap = await db.collection('users').doc(uid).collection('dailyCheckin').doc(todayStr).get();
+      if (checkinSnap.exists) todaySleep = (checkinSnap.data()?.sleepHours as number) || null;
+    } catch { /* ignore */ }
+
+    const sleepDisplay = todaySleep !== null ? `${todaySleep}h (logged today)` : `${avgSleep.toFixed(1)}h avg`;
+
+    const systemPrompt = `You are a proactive, caring personal assistant for ${(profile?.fullName as string) || 'the user'}. You help them stay organized, productive, AND maintain a healthy work-life balance. You care about their wellbeing, not just productivity.
 
 CURRENT CONTEXT (${now.toLocaleString()}):
 - Time: ${timeOfDay} (${hour}:00)
-- Pending tasks: ${goals.length} total (${categoryBreakdown.work} work, ${categoryBreakdown.family} family, ${categoryBreakdown.personal} personal, ${categoryBreakdown.health} health, ${categoryBreakdown.learning} learning, ${categoryBreakdown.social} social)
-- Balance: ${workPercent}% work ${isWorkHeavy ? '⚠️ SKEWED' : '✓ OK'}
+- Pending tasks: ${goals.length} (work: ${categoryBreakdown.work}, family: ${categoryBreakdown.family}, personal: ${categoryBreakdown.personal}, health: ${categoryBreakdown.health})
+- Balance: ${workPercent}% work ${isWorkHeavy ? '⚠️ TOO MUCH WORK' : '✓ OK'} | Family+Personal: ${familyPersonalPercent}% ${isLifeNeglected ? '⚠️ NEGLECTED' : '✓ OK'}
 - Overdue: ${overdueTasks.length} | Due today: ${todayTasks.length}
-- Sleep: ${avgSleep.toFixed(1)}h | Energy: ${currentEnergy}/10
-- Top priority: ${goals.sort((a,b) => b.priority - a.priority)[0]?.title || 'none'}
+- Sleep: ${sleepDisplay} | Energy: ${currentEnergy}/10
+- 🔥 Burnout risk: ${burnoutRisk}${burnoutSignals.length > 0 ? ` (${burnoutSignals.join(', ')})` : ''}
 
-BALANCE RULES:
-- Ideal: 30-40% work, 20% family, 20% personal, 10% health, 10% learning, 10% social
-- If work > 60%, suggest adding family, personal, or health tasks
-- Never plan only work tasks
-- Warn about burnout if 3+ work tasks scheduled without breaks
+PENDING TASKS:
+${goals.slice(0, 10).map(g => `- [P${g.priority}] ${g.title} (${g.category})${toDate(g.deadline) ? ` due ${toDate(g.deadline)!.toLocaleDateString()}` : ''}`).join('\n')}
 
-PENDING TASKS (first 10):
-${goals.slice(0, 10).map(g => `- [P${g.priority}] ${g.title} (${g.category}) ${toDate(g.deadline) ? `due ${toDate(g.deadline)!.toLocaleDateString()}` : ''}`).join('\n')}
+PROACTIVE BEHAVIOUR:
+- If burnout risk is HIGH, open with a wellbeing check before tasks
+- If work > 60%, mention it and suggest adding family/personal/health tasks
+- If family+personal < 15%, ask when they last spent quality time with loved ones
+- If sleep < 6h, warn them and suggest reducing today's workload
+- If energy < 4, suggest lighter tasks and a short walk/rest
+- Never schedule back-to-back work tasks without a break
+- When planning, always include at least one non-work task if any exist
 
-YOUR STYLE: Warm, direct, practical. Always specific. Offer to DO things, not advise. Be brief.
+YOUR STYLE: Warm, direct, honest. Name actual tasks. Offer to DO things. Be brief but complete.
 
 RULES:
-- If user says "plan my day", call schedule_day tool
-- If user says "add [task]", call create_task immediately
-- Mention overdue tasks first
-- If energy < 4, suggest lighter work
-- If work-heavy, proactively suggest balance
-- Warn when planning if schedule looks unhealthy`;
+- "plan my day" → call schedule_day
+- "add [task]" → call create_task immediately
+- Always address burnout signals before talking about productivity
+- A balanced life IS productive — remind the user of this`;
 
     const messages: Anthropic.Messages.MessageParam[] = [
       ...conversationHistory.slice(-10),
       { role: 'user', content: message },
     ];
 
+    // Resolve provider and model from user profile
+    const selectedProvider: string = (profile?.aiProvider as string) || 'auto';
+    const selectedModel: string = (profile?.aiModel as string) || '';
+
+    // Determine which backend to use
+    const useAnthropic =
+      selectedProvider === 'anthropic'
+        ? !!anthropicKey
+        : selectedProvider === 'openrouter'
+        ? false
+        : !!anthropicKey; // auto: prefer Anthropic when key is available
+
     // Call the AI
     let responseText = '';
     let toolBlocks: ToolBlock[] = [];
 
-    if (anthropicKey) {
-      const client = new Anthropic({ apiKey: anthropicKey });
+    if (useAnthropic) {
+      const model = selectedModel || 'claude-haiku-4-5-20251001';
+      const client = new Anthropic({ apiKey: anthropicKey! });
       const response = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model,
         max_tokens: 1024,
         system: systemPrompt,
         tools: TOOLS,
@@ -252,7 +290,8 @@ RULES:
         .filter(b => b.type === 'tool_use')
         .map(b => b.type === 'tool_use' ? { name: b.name, input: b.input as Record<string, unknown> } : { name: '', input: {} });
     } else {
-      const result = await callOpenRouter(openrouterKey!, systemPrompt, messages);
+      const model = selectedModel || 'anthropic/claude-3.5-haiku';
+      const result = await callOpenRouter(openrouterKey!, model, systemPrompt, messages);
       responseText = result.text;
       toolBlocks = result.toolBlocks;
     }

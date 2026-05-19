@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useSleepAndEnergy } from '@/hooks/useSleepAndEnergy';
+import { scheduleTaskReminder } from '@/lib/notificationScheduler';
 
 const PRIORITY_LABEL: Record<number, string> = { 1: 'Low', 2: 'Normal', 3: 'Medium', 4: 'High', 5: 'Critical' };
 
@@ -129,12 +130,12 @@ export default function Home() {
   const { profile, user } = useAuth();
   const { goals, createGoal, updateGoal, completeGoal } = useGoals(user?.uid);
   const { addNotification } = useNotifications();
-  const { energy, updateEnergy } = useSleepAndEnergy(user?.uid);
+  const { updateSleep } = useSleepAndEnergy(user?.uid);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [alertsFired, setAlertsFired] = useState(false);
   const [quickTask, setQuickTask] = useState('');
   const [addingTask, setAddingTask] = useState(false);
-  const [sleepHours, setSleepHours] = useState<number>(energy.lastSleepDuration || 7);
+  const [sleepHours, setSleepHours] = useState<number>(7);
   const [savingSleep, setSavingSleep] = useState(false);
 
   const hour = new Date().getHours();
@@ -207,11 +208,21 @@ export default function Home() {
     setSleepHours(value);
     setSavingSleep(true);
     try {
-      await updateEnergy({ lastSleepDuration: value });
+      await updateSleep(value);
     } finally {
       setSavingSleep(false);
     }
   };
+
+  // Schedule browser notifications for today's tasks
+  useEffect(() => {
+    if (!user || goals.length === 0) return;
+    scheduledTasksToday.forEach(task => {
+      if (task.scheduledStart) {
+        scheduleTaskReminder(task.title, new Date(task.scheduledStart));
+      }
+    });
+  }, [scheduledTasksToday.length]);
 
   useEffect(() => {
     if (!user || goals.length === 0 || alertsFired) return;

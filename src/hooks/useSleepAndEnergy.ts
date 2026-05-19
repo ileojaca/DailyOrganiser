@@ -6,9 +6,11 @@ import {
   where,
   orderBy,
   limit,
-  onSnapshot,
   Timestamp,
-  getDocs
+  getDocs,
+  doc,
+  setDoc,
+  serverTimestamp,
 } from 'firebase/firestore';
 
 export interface SleepData {
@@ -21,6 +23,7 @@ export interface EnergyData {
   currentLevel: number;
   recentAverage: number;
   lastRecordedDate: Date | null;
+  lastSleepDuration: number;
 }
 
 export function useSleepAndEnergy(userId: string | undefined) {
@@ -33,6 +36,7 @@ export function useSleepAndEnergy(userId: string | undefined) {
     currentLevel: 5,
     recentAverage: 5,
     lastRecordedDate: null,
+    lastSleepDuration: 7,
   });
   const [loading, setLoading] = useState(true);
 
@@ -69,6 +73,24 @@ export function useSleepAndEnergy(userId: string | undefined) {
       }
     };
 
+    const fetchCheckinData = async () => {
+      try {
+        const db = getDb();
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const checkinRef = doc(db, 'users', userId, 'dailyCheckin', todayStr);
+        const { getDoc } = await import('firebase/firestore');
+        const checkinSnap = await getDoc(checkinRef);
+        if (checkinSnap.exists()) {
+          const data = checkinSnap.data();
+          if (typeof data.sleepHours === 'number') {
+            setEnergy(prev => ({ ...prev, lastSleepDuration: data.sleepHours }));
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching checkin data:', error);
+      }
+    };
+
     const fetchEnergyData = async () => {
       try {
         const db = getDb();
@@ -92,11 +114,12 @@ export function useSleepAndEnergy(userId: string | undefined) {
           const currentLevel = entries[0]?.level || 5;
           const lastDate = entries[0]?.timestamp?.toDate?.() || new Date(entries[0]?.timestamp);
 
-          setEnergy({
+          setEnergy(prev => ({
+            ...prev,
             currentLevel,
             recentAverage,
             lastRecordedDate: lastDate,
-          });
+          }));
         }
       } catch (error) {
         console.error('Error fetching energy data:', error);
@@ -105,16 +128,26 @@ export function useSleepAndEnergy(userId: string | undefined) {
 
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchSleepData(), fetchEnergyData()]);
+      await Promise.all([fetchSleepData(), fetchEnergyData(), fetchCheckinData()]);
       setLoading(false);
     };
 
     loadData();
   }, [userId]);
 
+  const updateSleep = async (hours: number) => {
+    if (!userId) return;
+    const db = getDb();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const checkinRef = doc(db, 'users', userId, 'dailyCheckin', todayStr);
+    await setDoc(checkinRef, { sleepHours: hours, updatedAt: serverTimestamp() }, { merge: true });
+    setEnergy(prev => ({ ...prev, lastSleepDuration: hours }));
+  };
+
   return {
     sleep,
     energy,
     loading,
+    updateSleep,
   };
 }

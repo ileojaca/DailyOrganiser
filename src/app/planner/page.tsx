@@ -9,6 +9,7 @@ import AppShell from '@/components/AppShell';
 import DayViewCalendar from '@/components/DayViewCalendar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGoals } from '@/hooks/useGoals';
+import { scheduleTaskReminder } from '@/lib/notificationScheduler';
 
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
@@ -30,6 +31,23 @@ export default function PlannerPage() {
     d.setHours(0, 0, 0, 0);
     return d;
   });
+
+  // Schedule browser notifications for tasks happening today
+  useEffect(() => {
+    if (goalsLoading) return;
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    goals.forEach((task) => {
+      if (!task.scheduledStart) return;
+      const start = new Date(task.scheduledStart);
+      if (start >= todayStart && start <= todayEnd) {
+        scheduleTaskReminder(task.title, start);
+      }
+    });
+  }, [goals, goalsLoading]);
 
   const visibleTasks = goals.filter(g => {
     if (!g.scheduledStart) return false;
